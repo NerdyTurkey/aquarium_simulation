@@ -8,7 +8,7 @@ WIDTH = 1200
 HEIGHT = 800
 FPS = 60
 
-NUM_FISH = 5
+NUM_FISH = 1
 
 col_dict_short = {
     "beige": (245, 245, 220, 255),
@@ -56,6 +56,9 @@ YELLOW = 255, 255, 0
 DARKGRAY = 40, 40, 40
 
 BOUNCE_MARGIN = 100
+# To avoid problem with Vector2 normalize and scale to length vcrashing with very small vectors
+MIN_LENGTH = 1e-5
+
 
 # Fish properties; will be different for different types of fish
 
@@ -69,11 +72,24 @@ ACCELERATION_DURATION = 2000
 PROB_SWIM = 0.45
 PROB_HOVER = 0.45
 PROB_DART = 0.1
+
 # wander steering params
 MAX_FORCE = 0.4
-RAND_TARGET_TIME = 1000
-WANDER_RING_DISTANCE = 150 # 150 looks good
-WANDER_RING_RADIUS = 20  # 20 looks good
+RAND_TARGET_TIME = 200
+WANDER_RING_DISTANCE = 150  # 150 looks good
+WANDER_RING_RADIUS = 50  # 20 looks good
+
+# seek with approach params
+SEEK_RADIUS = 400  # only approach target when within this distance of it
+APPROACH_RADIUS = 50  # decelerate towards target at this distanc from it
+
+# evade params
+EVADE_RADIUS = 400
+
+# steering weights
+STEER_WEIGHT_WANDER = 1
+STEER_WEIGHT_SEEK = 0
+STEER_WEIGHT_EVADE = 1
 
 
 def lerp(a, b, f):
@@ -103,15 +119,23 @@ class Fish(pg.sprite.Sprite):
         body_rect = body.get_rect()
         colour = choice(ALL_COLOURS)
         pg.draw.ellipse(body, colour, body_rect)
-        eye_pos = vec(body_rect.midright) - vec(0.2*body_width, 0)
+        eye_pos = vec(body_rect.midright) - vec(0.2 * body_width, 0)
         tail_width = uniform(0.2, 0.5) * body_width
         tail_height = body_height
         tail = pg.Surface((tail_width, tail_height), pg.SRCALPHA)
-        tail_poly_pts = ((0, 0), (tail_width, 0.5*tail_height), (0, tail_height))
+        tail_poly_pts = ((0, 0), (tail_width, 0.5 * tail_height), (0, tail_height))
         pg.draw.circle(body, BLACK, eye_pos, 0.1 * body_width)
-        pg.draw.line(body, BLACK, (body_rect.right, body_rect.centery+5), (body_rect.right-0.2*body_width, body_rect.centery+5), 1)
+        pg.draw.line(
+            body,
+            BLACK,
+            (body_rect.right, body_rect.centery + 5),
+            (body_rect.right - 0.2 * body_width, body_rect.centery + 5),
+            1,
+        )
         pg.draw.polygon(tail, colour, tail_poly_pts)
-        self.image_right = pg.Surface((body_width + tail_width, body_height + tail_height), pg.SRCALPHA)
+        self.image_right = pg.Surface(
+            (body_width + tail_width, body_height + tail_height), pg.SRCALPHA
+        )
         self.image_right.blit(tail, (0, 0))
         self.image_right.blit(body, (tail_width, 0))
         self.image_left = pg.transform.flip(self.image_right, True, False)
@@ -135,27 +159,68 @@ class Fish(pg.sprite.Sprite):
         self.is_accelerating = False
 
     def seek(self, target):
-        self.desired = (target - self.pos).normalize() * MAX_SPEED[self.state]  # for vector plotting only
+        self.desired = (target - self.pos).normalize() * MAX_SPEED[
+            self.state
+        ]  # for vector plotting only
         steer = self.desired - self.vel
         if steer.length() > MAX_FORCE:
             steer.scale_to_length(MAX_FORCE)
         return steer
 
     def wander(self):
-        future = self.pos + self.vel.normalize() * WANDER_RING_DISTANCE
-        target = future + vec(WANDER_RING_RADIUS, 0).rotate(uniform(0, 360))
-        self.displacement = target  # for vector plotting only
-        return self.seek(target)
+        now = pg.time.get_ticks()
+        if now - self.last_update > RAND_TARGET_TIME:
+            self.last_update = now
+            future = self.pos + self.vel.normalize() * WANDER_RING_DISTANCE
+            self.target = future + vec(WANDER_RING_RADIUS, 0).rotate(uniform(0, 360))
+        return self.seek(self.target)
+
+    def is_ahead(self, target):
+        dx = target.x - self.pos.x
+        if dx > 0 and self.vel.x > 0:
+            return True
+        if dx < 0 and self.vel.x < 0:
+            return True
+        return False
+
+    def seek_with_approach(self, target, ahead_only=True):
+        """
+        Decelerates towards target
+        """
+        steer = vec(0, 0)
+        if ahead_only and not self.is_ahead(target):
+            return steer
+        dist = target - self.pos
+        if SEEK_RADIUS > dist.length() > MIN_LENGTH:
+            desired = dist.normalize() * MAX_SPEED[self.state]
+            if dist.length() < APPROACH_RADIUS:
+                desired *= dist.length() / APPROACH_RADIUS
+            steer = desired - self.vel
+            if steer.length() > MAX_FORCE:
+                steer.scale_to_length(MAX_FORCE)
+        return steer
+
+    def evade(self, target, ahead_only=True):
+        steer = vec(0, 0)
+        if ahead_only and not self.is_ahead(target):
+            return steer
+        dist = self.pos - target
+        if EVADE_RADIUS > dist.length() > MIN_LENGTH:
+            desired = dist.normalize() * MAX_SPEED[self.state]
+            steer = desired - self.vel
+            if steer.length() > MAX_FORCE:
+                steer.scale_to_length(MAX_FORCE)
+        return steer
 
     def handle_walls(self, method="turn"):
         if method == "wrap":
             hw = 0.5 * self.rect.w
             hh = 0.5 * self.rect.h
-            if self.pos.x < - hw:
+            if self.pos.x < -hw:
                 self.pos.x = WIDTH + hw
             elif self.pos.x > WIDTH + hw:
                 self.pos.x = -hw
-            if self.pos.y < - hh:
+            if self.pos.y < -hh:
                 self.pos.y = HEIGHT + hh
             elif self.pos.y > HEIGHT + hh:
                 self.pos.y = -hh
@@ -167,29 +232,45 @@ class Fish(pg.sprite.Sprite):
 
     def update(self):
         now = pg.time.get_ticks()
-        if now - self.time_of_last_state_change > self.duration_of_current_state:
-            self.duration_of_current_state = randint(MIN_STATE_DURATION, MAX_STATE_DURATION)
+        if (
+            not self.is_accelerating
+            and now - self.time_of_last_state_change > self.duration_of_current_state
+        ):
+            self.duration_of_current_state = randint(
+                MIN_STATE_DURATION, MAX_STATE_DURATION
+            )
             self.time_of_last_state_change = now
             if self.state == "dart":
                 self.state = "swim"
             else:
-                self.state = choices(("swim", "hover", "dart"), weights=(PROB_SWIM,  PROB_HOVER, PROB_DART))[0]
+                self.state = choices(
+                    ("swim", "hover", "dart"),
+                    weights=(PROB_SWIM, PROB_HOVER, PROB_DART),
+                )[0]
             if self.state == "dart":
                 self.duration_of_current_state *= 0.4  # darts are shorter duration
             self.old_speed = self.vel.length()
             self.new_speed = uniform(MIN_SPEED[self.state], MAX_SPEED[self.state])
             self.is_accelerating = True
-        self.acc = self.wander()
+        # ----
+        mp = vec(pg.mouse.get_pos())
+        self.acc = (
+            STEER_WEIGHT_WANDER * self.wander()
+            + STEER_WEIGHT_SEEK * self.seek_with_approach(mp)
+            + STEER_WEIGHT_EVADE * self.evade(mp)
+        )
+        # ---
         self.vel += self.acc
         if self.is_accelerating:
             frac = (now - self.time_of_last_state_change) / ACCELERATION_DURATION
             easing_frac = 3 * frac * frac - 2 * frac * frac * frac
+            # interp_speed = lerp(self.old_speed, self.new_speed, frac) # linear easing
             interp_speed = lerp(self.old_speed, self.new_speed, easing_frac)
             self.vel.scale_to_length(interp_speed)
             if frac >= 1:
                 self.is_accelerating = False
         speed = self.vel.length()
-        if speed > MAX_SPEED[self.state]:
+        if not self.is_accelerating and speed > MAX_SPEED[self.state]:
             self.vel.scale_to_length(MAX_SPEED[self.state])
         # elif speed < MIN_SPEED[self.state]:
         #     self.vel.scale_to_length(MIN_SPEED[self.state])
@@ -206,7 +287,7 @@ class Fish(pg.sprite.Sprite):
         # acceleration indicator
         if self.is_accelerating:
             pg.draw.circle(self.screen, WHITE, self.pos, 50, 5)
-        scale = 25
+        scale = 100
         # vel
         pg.draw.line(self.screen, GREEN, self.pos, (self.pos + self.vel * scale), 5)
         # desired
@@ -214,9 +295,14 @@ class Fish(pg.sprite.Sprite):
         # target
         center = self.pos + self.vel.normalize() * WANDER_RING_DISTANCE
         pg.draw.circle(
-            self.screen, WHITE, (int(center.x), int(center.y)), WANDER_RING_RADIUS, 1
+            self.screen,
+            WHITE,
+            center,
+            WANDER_RING_RADIUS,
+            1
+            # self.screen, WHITE, (int(center.x), int(center.y)), WANDER_RING_RADIUS, 1
         )
-        pg.draw.line(self.screen, CYAN, center, self.displacement, 5)
+        pg.draw.line(self.screen, CYAN, center, self.target, 5)
 
 
 def main():
