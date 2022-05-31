@@ -1,91 +1,109 @@
-import json
+import os
 from itertools import cycle
 import pygame as pg
 
+# Read from consolidates spritesheets.
+# Then run all animations to check proper loading.
+
 WIDTH, HEIGHT = 900, 600
 FPS = 60
+
+COLOURS = ("blue", "green", "orange", "pink", "red", "yellow")
+COLOUR_INDEX = {col: i for i, col in enumerate(COLOURS)}
+NUM_COLOURS = len(COLOURS)
+
+STATES = ("idle", "swim", "swim-chomp")
+STATE_INDEX = {state: i for i, state in enumerate(STATES)}
+NUM_STATES = len(STATES)
+
+DIRECTIONS = ("left", "right")
+DIRECTION_INDEX = {dirn: i for i, dirn in enumerate(DIRECTIONS)}
+NUM_DIRECTIONS = len(DIRECTIONS)
+
+NUM_FRAMES = (20, 16, 20)
+NUM_COLS = max(NUM_FRAMES)
+
+# # full size
+# DIR = os.path.join("fish spritesheets", "full size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_full_size_0"
+# FRAME_W, FRAME_H = 444, 283
+# IMAGE_SIZES = {"1": (376, 283), "2": (295, 253), "3": (396, 269), "4": (216, 149), "5": (444, 281), "6": (318, 280)}
+
+# half size
+DIR = os.path.join("fish spritesheets", "half size")
+SPRITESHEET_FNAME_STEM = "fish_spritesheet_half_size_0"
+FRAME_W, FRAME_H = 222, 141
+# frame size is constant, but image sizes within frame vary (but toplefts aligned)
+IMAGE_SIZES = {
+    "1": (188, 141),
+    "2": (147, 126),
+    "3": (198, 134),
+    "4": (108, 74),
+    "5": (222, 140),
+    "6": (159, 140),
+}
+
+
+def get_spritesheet_row(colour, state, direction):
+    return (
+        NUM_STATES * NUM_DIRECTIONS * COLOUR_INDEX[colour]
+        + (NUM_STATES - 1) * STATE_INDEX[state]
+        + (NUM_DIRECTIONS - 1) * DIRECTION_INDEX[direction]
+    )
+
 
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
 clock = pg.time.Clock()
 
-spritesheet_info = {}
+# read in all sprite sheets
+
+fish_frames = {}
 for i in range(1, 7):
-    fname = "spritesheet0" + str(i) + ".json"
-    with open(fname, "r") as f:
-        data = json.load(f)
-    info = data["frames"]
-    for frame_id, frame_info in info.items():
-        x = frame_info["frame"]["x"]
-        y = frame_info["frame"]["y"]
-        w = frame_info["frame"]["w"]
-        h = frame_info["frame"]["h"]
-        parts = frame_id.split("_")
-        if len(parts) == 6:
-            colour = parts[2]
-            state = parts[4]
-            frame_number = parts[5].split(".")[0][1:]
-            key = "0" + str(i) + "_" + colour + "_" + state + "_" + frame_number
-        else:
-            colour = parts[2]
-            state = parts[4]
-            extra = parts[5]
-            frame_number = parts[6].split(".")[0][1:]
-            key = (
-                "0"
-                + str(i)
-                + "_"
-                + colour
-                + "_"
-                + state
-                + "_"
-                + extra
-                + "_"
-                + frame_number
-            )
-        # print(key)
-        spritesheet_info[key] = [(x, y), (w, h)]
-
-frames = {}
-
-for key, frame_info in spritesheet_info.items():
-    spritesheet = pg.image.load("spritesheet" + key[:2] + ".png")
-    (x, y), (w, h) = frame_info
-    frame = pg.Surface((w, h), pg.SRCALPHA)
-    frame.blit(spritesheet, (-x, -y))
-    frames[key] = frame
-
-# ToDo
-# sort into dict with keys = fish_number + "_" + colour + "_" + state + ("_" + "chomping"), values = cycle(frames)
-# idle has 20 frames
-# swim has 16 frames
-# swim chomping has 16 frames
+    print(i)
+    fish_num = str(i)
+    spritesheet = pg.image.load(
+        os.path.join(DIR, SPRITESHEET_FNAME_STEM + fish_num + ".png")
+    )
+    for colour in COLOURS:
+        for state, n in zip(STATES, NUM_FRAMES):
+            # fishtypes 1, 4 and 5 have no swim chomp animation frames
+            if i in [1, 4, 5] and state == "swim-chomp":
+                continue
+            for direction in DIRECTIONS:
+                frames = []
+                for j in range(n):
+                    key = fish_num + "_" + colour + "_" + state + "_" + direction
+                    frame = pg.Surface(IMAGE_SIZES[fish_num], pg.SRCALPHA)
+                    x, y = (
+                        j * FRAME_W,
+                        get_spritesheet_row(colour, state, direction) * FRAME_H,
+                    )
+                    # print(x,y)
+                    frame.blit(spritesheet, (-x, -y))
+                    frames.append(frame)
+                fish_frames[key] = cycle(frames)
 
 
-# frames_by_type = {}
-# for i in range(1, 7):
-#     fish_type = "0" + str(i)
-#     sprite_sheet = pg.image.load("spritesheet" + fish_type + ".png")
-#     frames_by_colour = {}
-#     for colour, info in frames_toplefts.items():
-#         frames_by_state = {}
-#         for state, toplefts in info.items():
-#             frames = []
-#             for x, y in toplefts:
-#                 frame = pg.Surface((FRAME_W, FRAME_H), pg.SRCALPHA)
-#                 frame.blit(sprite_sheet, (-x, -y))
-#                 frames.append(frame)
-#             frames_by_state[state] = cycle(frames)
-#         frames_by_colour[colour] = frames_by_state
-#     frames_by_type[fish_type] = frames_by_colour
-#
-#
-# fish_type = "01"
-# colour = "green"
-# state = "idle"
-# running = True
-# while running:
-#     clock.tick(FPS)
-#     screen.fill("black")
-#     screen.blit(next(frames_by_type[fish_type][colour][state]), (100, 100))
-#     pg.display.flip()
+# check animations
+duration = 400
+blit_topleft = 100, 100
+for i in range(1, 7):
+    for colour in COLOURS:
+        for state in STATES:
+            for direction in DIRECTIONS:
+                key = str(i) + "_" + colour + "_" + state + "_" + direction
+                print(key)
+                start_time = pg.time.get_ticks()
+                while pg.time.get_ticks() - start_time < duration:
+                    clock.tick(FPS)
+                    screen.fill("black")
+                    try:
+                        frame = next(fish_frames[key])
+                    except:
+                        print("not found")
+                        break
+                    screen.blit(frame, blit_topleft)
+                    pg.display.flip()
+
+pg.quit()
