@@ -8,16 +8,37 @@ import pygame as pg
 
 WIDTH, HEIGHT = 900, 600
 FPS = 60
-
-# make full size spritesheet
-SCALE_FACTOR = 1  # scaling factor from raw sprite sheet to output sprite sheet
-WRITE_DIR = os.path.join("fish spritesheets", "full size")
-WRITE_FNAME_STEM = "fish_spritesheet_full_size_0"
+#
+# # make full size spritesheet
+# SCALE_FACTOR = 1  # scaling factor from raw sprite sheet to output sprite sheet
+# WRITE_DIR = os.path.join("fish spritesheets", "full size")
+# WRITE_FNAME_STEM = "fish_spritesheet_full_size_0"
 
 # # make half size spritesheet
 # SCALE_FACTOR = 0.5  # scaling factor from raw sprite sheet to output sprite sheet
 # WRITE_DIR = os.path.join("fish spritesheets", "half size")
 # WRITE_FNAME_STEM = "fish_spritesheet_half_size_0"
+
+# # make one third size spritesheet
+# SCALE_FACTOR = 0.33  # scaling factor from raw sprite sheet to output sprite sheet
+# WRITE_DIR = os.path.join("fish spritesheets", "third size")
+# WRITE_FNAME_STEM = "fish_spritesheet_third_size_0"
+#
+# # make one quarter size spritesheet
+# SCALE_FACTOR = 0.25  # scaling factor from raw sprite sheet to output sprite sheet
+# WRITE_DIR = os.path.join("fish spritesheets", "quarter size")
+WRITE_FNAME_STEM = "fish_spritesheet_quarter_size_0"
+
+# # make one fifth size spritesheet
+# SCALE_FACTOR = 0.2  # scaling factor from raw sprite sheet to output sprite sheet
+# WRITE_DIR = os.path.join("fish spritesheets", "fifth size")
+# WRITE_FNAME_STEM = "fish_spritesheet_fifth_size_0"
+
+
+# make one eighth size spritesheet
+SCALE_FACTOR = 0.125  # scaling factor from raw sprite sheet to output sprite sheet
+WRITE_DIR = os.path.join("fish spritesheets", "eighth size")
+WRITE_FNAME_STEM = "fish_spritesheet_eighth_size_0"
 
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -62,8 +83,8 @@ output_frame_width, output_frame_height = (
     int(SCALE_FACTOR * max_frame_height),
 )
 
-# print(output_frame_width, output_frame_height)
-# print(num_cols * output_frame_width, num_rows * output_frame_height)
+print(f"frame width, height = {output_frame_width}, {output_frame_height}")
+print(f"overall width, height = {NUM_COLS * output_frame_width}, {NUM_ROWS * output_frame_height}")
 
 for i in range(1, 7):
     print(i)
@@ -94,14 +115,14 @@ for i in range(1, 7):
                     frame = pg.transform.rotozoom(frame, 0, SCALE_FACTOR)
                     if direction == "right":
                         frame = pg.transform.flip(frame, True, False)
-                    # print(key2, frame.get_size())
+                    if colour=="blue" and direction=="left" and j==0: print(key2, frame.get_size())
                     output_spritesheet.blit(
                         frame, (j * output_frame_width, row * output_frame_height)
                     )
                     frames.append(frame)
                 row += 1
                 fish_frames[key2] = cycle(frames)
-    pg.image.save(os.path.join(WRITE_DIR, WRITE_FNAME_STEM + fish_num + ".png"))
+    pg.image.save(output_spritesheet, os.path.join(WRITE_DIR, WRITE_FNAME_STEM + fish_num + ".png"))
 
 
 duration = 500

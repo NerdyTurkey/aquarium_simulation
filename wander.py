@@ -1,6 +1,7 @@
 import math
 import pygame as pg
 from random import random, randint, uniform, choice, choices
+from buffer_smooth import BufferSmooth
 
 vec = pg.math.Vector2
 
@@ -65,7 +66,7 @@ MIN_LENGTH = 1e-5
 MIN_SPEED = {"hover": 0.1, "swim": 0.5, "dart": 2}
 MAX_SPEED = {"hover": 0.4, "swim": 1, "dart": 4}
 # should these be state-dependent?
-MAX_ANGLE_WITH_HORIZONTAL = 30  # degrees
+MAX_ANGLE_WITH_HORIZONTAL = 10  # degrees
 MIN_STATE_DURATION = 2000
 MAX_STATE_DURATION = 10000
 ACCELERATION_DURATION = 2000
@@ -73,15 +74,18 @@ PROB_SWIM = 0.45
 PROB_HOVER = 0.45
 PROB_DART = 0.1
 
+# angular steering
+ANGLE_SMOOTHING_BUFFER_SIZE = 5 # angle of fish is running average of this many frames
+
 # wander steering params
 MAX_FORCE = 0.4
-RAND_TARGET_TIME = 200
-WANDER_RING_DISTANCE = 150  # 150 looks good
-WANDER_RING_RADIUS = 50  # 20 looks good
+RAND_TARGET_TIME = 1000
+WANDER_RING_DISTANCE = 400
+WANDER_RING_RADIUS = 50
 
 # seek with approach params
 SEEK_RADIUS = 400  # only approach target when within this distance of it
-APPROACH_RADIUS = 50  # decelerate towards target at this distanc from it
+APPROACH_RADIUS = 50  # decelerate towards target at this distance from it
 
 # evade params
 EVADE_RADIUS = 400
@@ -121,6 +125,16 @@ def blitRotate(surf, image, pos, origin_pos, angle):
     )
 
 
+def rotate_about_centre(surf, rect, angle):
+    """
+    Pass in a surface `surf` and its rect `rect` and the rotated surface and its new rect are returned.
+    Rotation is about the centre of rect.
+    `angle`is the rotation angle in degrees, >0 --> clockwise
+    """
+    rotated_surf = pg.transform.rotate(surf, angle)
+    return rotated_surf, rotated_surf.get_rect(center=rect.center)
+
+
 def lerp(a, b, f):
     return a + (b - a) * f
 
@@ -142,7 +156,7 @@ class Fish(pg.sprite.Sprite):
     def __init__(self, screen, sprite_group):
         self.groups = sprite_group
         pg.sprite.Sprite.__init__(self, self.groups)
-        body_width = randint(30, 50)
+        body_width =  randint(30, 50)
         body_height = uniform(0.2, 0.8) * body_width
         body = pg.Surface((body_width, body_height), pg.SRCALPHA)
         body_rect = body.get_rect()
@@ -167,17 +181,13 @@ class Fish(pg.sprite.Sprite):
         )
         self.image_right.blit(tail, (0, 0))
         self.image_right.blit(body, (tail_width, 0))
-        self.image_left = pg.transform.flip(self.image_right, True, False)
         self.screen = screen
         self.state = "swim"
         self.pos = vec(randint(0, WIDTH), randint(0, HEIGHT))
         self.vel = vec(uniform(MIN_SPEED[self.state], MAX_SPEED[self.state]), 0).rotate(
             uniform(0, 360)
         )
-        if self.vel.x >= 0:
-            self.image = self.image_right
-        else:
-            self.image = self.image_left
+        self.image = self.image_right
         self.rect = self.image.get_rect()
         self.acc = vec(0, 0)
         self.rect.center = self.pos
@@ -186,6 +196,8 @@ class Fish(pg.sprite.Sprite):
         self.duration_of_current_state = randint(MIN_STATE_DURATION, MAX_STATE_DURATION)
         self.time_of_last_state_change = pg.time.get_ticks()
         self.is_accelerating = False
+        self.buffer_smooth = BufferSmooth(buffer_size=ANGLE_SMOOTHING_BUFFER_SIZE)
+
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * MAX_SPEED[
@@ -289,6 +301,7 @@ class Fish(pg.sprite.Sprite):
             + STEER_WEIGHT_EVADE * self.evade(mp)
         )
         # ---
+        self.last_vel = vec(self.vel)
         self.vel += self.acc
         if self.is_accelerating:
             frac = (now - self.time_of_last_state_change) / ACCELERATION_DURATION
@@ -304,21 +317,27 @@ class Fish(pg.sprite.Sprite):
         # elif speed < MIN_SPEED[self.state]:
         #     self.vel.scale_to_length(MIN_SPEED[self.state])
         self.vel = clamp_angle_to_horizontal(self.vel, MAX_ANGLE_WITH_HORIZONTAL)
+        if (self.vel.x > 0 and self.last_vel.x < 0) or (self.vel.x < 0 and self.last_vel.x > 0):
+            print("\nChanged direction!")
         self.pos += self.vel
         self.handle_walls(method="wrap")
         if self.vel.x >= 0:
             self.image = self.image_right
         else:
-            self.image = self.image_left
+            self.image = pg.transform.flip(self.image_right, False, True)
+        angle = math.degrees(math.atan2(-self.vel.y, self.vel.x))
+        angle = self.buffer_smooth.smooth(angle)
+        # print(f"{angle:.0f}")
+        self.image, self.rect = rotate_about_centre(self.image, self.rect, angle)
         self.rect.center = self.pos
 
     def draw_vectors(self):
         # acceleration indicator
-        if self.is_accelerating:
-            pg.draw.circle(self.screen, WHITE, self.pos, 50, 5)
-        scale = 100
+        # if self.is_accelerating:
+        #     pg.draw.circle(self.screen, WHITE, self.pos, 50, 5)
+        scale = 50
         # vel
-        pg.draw.line(self.screen, GREEN, self.pos, (self.pos + self.vel * scale), 5)
+        pg.draw.line(self.screen, GREEN, self.pos, (self.pos + self.vel.normalize() * scale), 5)
         # desired
         pg.draw.line(self.screen, RED, self.pos, (self.pos + self.desired * scale), 5)
         # target

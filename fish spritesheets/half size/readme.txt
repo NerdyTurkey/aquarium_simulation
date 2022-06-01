@@ -25,12 +25,7 @@ Note:
 FishTypes 01, 04, 05 don't have swim-chomp frames (those frames will be blank in spritesheet)
 
 Image frame sizes (generally smaller than actual frame size)
-01: 188 x 141 
-02: 147 x 126
-03: 198 x 134
-04: 108 x 74
-05: 222 x 140
-06: 159 x 140
+IMAGE_SIZES = {"01": (188, 141), "02": (147, 126), "03": (198, 134), "04": (108, 74), "05": (222, 140), "06": (159, 140)}
 
 
 

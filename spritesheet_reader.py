@@ -29,19 +29,48 @@ NUM_COLS = max(NUM_FRAMES)
 # FRAME_W, FRAME_H = 444, 283
 # IMAGE_SIZES = {"1": (376, 283), "2": (295, 253), "3": (396, 269), "4": (216, 149), "5": (444, 281), "6": (318, 280)}
 
-# half size
-DIR = os.path.join("fish spritesheets", "half size")
-SPRITESHEET_FNAME_STEM = "fish_spritesheet_half_size_0"
-FRAME_W, FRAME_H = 222, 141
+# # half size
+# DIR = os.path.join("fish spritesheets", "half size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_half_size_0"
+# FRAME_W, FRAME_H = 222, 141
+# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
+# IMAGE_SIZES = {
+#     "1": (188, 141),
+#     "2": (147, 126),
+#     "3": (198, 134),
+#     "4": (108, 74),
+#     "5": (222, 140),
+#     "6": (159, 140),
+# }
+
+# # third size
+# DIR = os.path.join("fish spritesheets", "third size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_third_size_0"
+# FRAME_W, FRAME_H = 146, 93
+# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
+# IMAGE_SIZES = {"1": (124, 93), "2": (97, 83), "3": (130, 88), "4": (71, 49), "5": (146, 92), "6": (104, 92)}
+
+# # quarter size
+# DIR = os.path.join("fish spritesheets", "quarter size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_quarter_size_0"
+# FRAME_W, FRAME_H = 111, 70
+# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
+# IMAGE_SIZES = {"1": (94, 70), "2": (73, 63), "3": (99, 67), "4": (54, 37), "5": (111, 70), "6": (79, 70)}
+
+# fifth size
+DIR = os.path.join("fish spritesheets", "fifth size")
+SPRITESHEET_FNAME_STEM = "fish_spritesheet_fifth_size_0"
+FRAME_W, FRAME_H = 88, 56
 # frame size is constant, but image sizes within frame vary (but toplefts aligned)
-IMAGE_SIZES = {
-    "1": (188, 141),
-    "2": (147, 126),
-    "3": (198, 134),
-    "4": (108, 74),
-    "5": (222, 140),
-    "6": (159, 140),
-}
+IMAGE_SIZES = {"1": (75, 56), "2": (59, 50), "3": (79, 53), "4": (43, 29), "5": (88, 56), "6": (63, 56)}
+
+
+# # eighth size
+# DIR = os.path.join("fish spritesheets", "eighth size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_eighth_size_0"
+# FRAME_W, FRAME_H = 55, 35
+# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
+# IMAGE_SIZES = {"1": (47, 35), "2": (36, 31), "3": (49, 33), "4": (27, 18), "5": (55, 35), "6": (39, 35)}
 
 
 def get_spritesheet_row(colour, state, direction):
