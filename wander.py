@@ -68,14 +68,20 @@ MAX_SPEED = {"hover": 0.4, "swim": 1, "dart": 4}
 # should these be state-dependent?
 MAX_ANGLE_WITH_HORIZONTAL = 10  # degrees
 MIN_STATE_DURATION = 2000
-MAX_STATE_DURATION = 10000
+MAX_STATE_DURATION = 2000  # 10000
 ACCELERATION_DURATION = 2000
 PROB_SWIM = 0.45
 PROB_HOVER = 0.45
 PROB_DART = 0.1
+# PROB_TURN = 1
+FRICTION = 1
+# turning
+SMALL_VX = 0.1
+TURN_DURATION = 2000
+TURN_RATE = math.pi / TURN_DURATION
 
 # angular steering
-ANGLE_SMOOTHING_BUFFER_SIZE = 5 # angle of fish is running average of this many frames
+ANGLE_SMOOTHING_BUFFER_SIZE = 5  # angle of fish is running average of this many frames
 
 # wander steering params
 MAX_FORCE = 0.4
@@ -91,9 +97,9 @@ APPROACH_RADIUS = 50  # decelerate towards target at this distance from it
 EVADE_RADIUS = 400
 
 # steering weights
-STEER_WEIGHT_WANDER = 1
+STEER_WEIGHT_WANDER = 0
 STEER_WEIGHT_SEEK = 0
-STEER_WEIGHT_EVADE = 1
+STEER_WEIGHT_EVADE = 5
 
 
 def blitRotate(surf, image, pos, origin_pos, angle):
@@ -156,11 +162,11 @@ class Fish(pg.sprite.Sprite):
     def __init__(self, screen, sprite_group):
         self.groups = sprite_group
         pg.sprite.Sprite.__init__(self, self.groups)
-        body_width =  randint(30, 50)
-        body_height = uniform(0.2, 0.8) * body_width
+        body_width = 100  # randint(30, 50)
+        body_height = 50  # uniform(0.2, 0.8) * body_width
         body = pg.Surface((body_width, body_height), pg.SRCALPHA)
         body_rect = body.get_rect()
-        colour = choice(ALL_COLOURS)
+        colour = "cyan"  # choice(ALL_COLOURS)
         pg.draw.ellipse(body, colour, body_rect)
         eye_pos = vec(body_rect.midright) - vec(0.2 * body_width, 0)
         tail_width = uniform(0.2, 0.5) * body_width
@@ -181,6 +187,7 @@ class Fish(pg.sprite.Sprite):
         )
         self.image_right.blit(tail, (0, 0))
         self.image_right.blit(body, (tail_width, 0))
+        self.image_left = pg.transform.flip(self.image_right, True, False)
         self.screen = screen
         self.state = "swim"
         self.pos = vec(randint(0, WIDTH), randint(0, HEIGHT))
@@ -195,9 +202,23 @@ class Fish(pg.sprite.Sprite):
         self.target = vec(randint(0, WIDTH), randint(0, HEIGHT))
         self.duration_of_current_state = randint(MIN_STATE_DURATION, MAX_STATE_DURATION)
         self.time_of_last_state_change = pg.time.get_ticks()
-        self.is_accelerating = False
+        self.transitioning = False
         self.buffer_smooth = BufferSmooth(buffer_size=ANGLE_SMOOTHING_BUFFER_SIZE)
+        self.turning = False
+        self.turn_has_flipped = False
 
+    def evade(self, target, ahead_only=True):
+        steer = vec(0, 0)
+        if ahead_only and not self.is_ahead(target):
+            return steer
+        dist = self.pos - target
+        if EVADE_RADIUS > dist.length() > MIN_LENGTH:
+            desired = dist.normalize() * MAX_SPEED[self.state]
+            steer = desired - self.vel
+            if steer.length() > MAX_FORCE:
+                steer.scale_to_length(MAX_FORCE)
+        print(steer)
+        return steer
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * MAX_SPEED[
@@ -241,18 +262,6 @@ class Fish(pg.sprite.Sprite):
                 steer.scale_to_length(MAX_FORCE)
         return steer
 
-    def evade(self, target, ahead_only=True):
-        steer = vec(0, 0)
-        if ahead_only and not self.is_ahead(target):
-            return steer
-        dist = self.pos - target
-        if EVADE_RADIUS > dist.length() > MIN_LENGTH:
-            desired = dist.normalize() * MAX_SPEED[self.state]
-            steer = desired - self.vel
-            if steer.length() > MAX_FORCE:
-                steer.scale_to_length(MAX_FORCE)
-        return steer
-
     def handle_walls(self, method="turn"):
         if method == "wrap":
             hw = 0.5 * self.rect.w
@@ -274,15 +283,24 @@ class Fish(pg.sprite.Sprite):
     def update(self):
         now = pg.time.get_ticks()
         if (
-            not self.is_accelerating
+            not self.transitioning
             and now - self.time_of_last_state_change > self.duration_of_current_state
         ):
+            print("changing state...")
             self.duration_of_current_state = randint(
                 MIN_STATE_DURATION, MAX_STATE_DURATION
             )
             self.time_of_last_state_change = now
             if self.state == "dart":
                 self.state = "swim"
+            # elif self.state == "hover" and random() <= PROB_TURN:
+            #     print("change to turning")
+            #     self.vel.x = 0
+            #     self.turning = True
+            #     self.turn_start_time = pg.time.get_ticks()
+            #     self.image_save = self.image.copy()
+            #     self.is_flipped = False
+            #     return
             else:
                 self.state = choices(
                     ("swim", "hover", "dart"),
@@ -292,52 +310,77 @@ class Fish(pg.sprite.Sprite):
                 self.duration_of_current_state *= 0.4  # darts are shorter duration
             self.old_speed = self.vel.length()
             self.new_speed = uniform(MIN_SPEED[self.state], MAX_SPEED[self.state])
-            self.is_accelerating = True
+            self.transitioning = True
         # ----
         mp = vec(pg.mouse.get_pos())
         self.acc = (
             STEER_WEIGHT_WANDER * self.wander()
             + STEER_WEIGHT_SEEK * self.seek_with_approach(mp)
-            + STEER_WEIGHT_EVADE * self.evade(mp)
+            + STEER_WEIGHT_EVADE * self.evade(mp, ahead_only=False)
+            - vec(FRICTION * self.vel.x ** 2, 0)
         )
         # ---
         self.last_vel = vec(self.vel)
         self.vel += self.acc
-        if self.is_accelerating:
+        if self.transitioning:
             frac = (now - self.time_of_last_state_change) / ACCELERATION_DURATION
             easing_frac = 3 * frac * frac - 2 * frac * frac * frac
             # interp_speed = lerp(self.old_speed, self.new_speed, frac) # linear easing
             interp_speed = lerp(self.old_speed, self.new_speed, easing_frac)
             self.vel.scale_to_length(interp_speed)
             if frac >= 1:
-                self.is_accelerating = False
+                self.transitioning = False
         speed = self.vel.length()
-        if not self.is_accelerating and speed > MAX_SPEED[self.state]:
+        if not self.transitioning and speed > MAX_SPEED[self.state]:
             self.vel.scale_to_length(MAX_SPEED[self.state])
-        # elif speed < MIN_SPEED[self.state]:
-        #     self.vel.scale_to_length(MIN_SPEED[self.state])
+        if speed < MIN_SPEED[self.state]:
+            self.vel.scale_to_length(MIN_SPEED[self.state])
+        print(f"{self.vel.x:.2f}")
         self.vel = clamp_angle_to_horizontal(self.vel, MAX_ANGLE_WITH_HORIZONTAL)
-        if (self.vel.x > 0 and self.last_vel.x < 0) or (self.vel.x < 0 and self.last_vel.x > 0):
-            print("\nChanged direction!")
+        # if (self.vel.x > SMALL_VX and self.last_vel.x < SMALL_VX) or (self.vel.x < SMALL_VX and self.last_vel.x > SMALL_VX):
+        #     print("\nChanged direction!")
+        #     self.turning = True
+        #     self.turn_start_time = pg.time.get_ticks()
         self.pos += self.vel
         self.handle_walls(method="wrap")
         if self.vel.x >= 0:
             self.image = self.image_right
+            self.dirn = "right"
         else:
-            self.image = pg.transform.flip(self.image_right, False, True)
-        angle = math.degrees(math.atan2(-self.vel.y, self.vel.x))
-        angle = self.buffer_smooth.smooth(angle)
-        # print(f"{angle:.0f}")
-        self.image, self.rect = rotate_about_centre(self.image, self.rect, angle)
+            # self.image = pg.transform.flip(self.image_right, False, True)
+            self.image = self.image_left
+            self.dirn = "left"
+        # angle = math.degrees(math.atan2(-self.vel.y, self.vel.x))
+        # angle = self.buffer_smooth.smooth(angle)
+        # # print(f"{angle:.0f}")
+        # self.image, self.rect = rotate_about_centre(self.image, self.rect, angle)
+        # if self.turning:
+        #     elapsed = now - self.turn_start_time
+        #     if elapsed < TURN_DURATION:
+        #         if elapsed >= 0.5 * TURN_DURATION and not self.turn_has_flipped:
+        #             # 2nd half of turn animation
+        #             # flip image horizontally
+        #             self.image = pg.transform.flip(self.image, True, False)
+        #             self.turn_has_flipped = True
+        #         self.image = pg.transform.smoothscale(self.image, (
+        #         int(abs(self.rect.w * math.cos(TURN_RATE * elapsed))), self.rect.h))
+        #     else:
+        #         # turn finished
+        #         self.turning = False
+        #         self.state = "swim"
+        #         self.dirn = "left" if self.dirn == "right" else "right"
+        #         # self.vel.x *= 20 # kick to prevent immediately turning again
         self.rect.center = self.pos
 
     def draw_vectors(self):
         # acceleration indicator
-        # if self.is_accelerating:
+        # if self.transitioning:
         #     pg.draw.circle(self.screen, WHITE, self.pos, 50, 5)
         scale = 50
         # vel
-        pg.draw.line(self.screen, GREEN, self.pos, (self.pos + self.vel.normalize() * scale), 5)
+        pg.draw.line(
+            self.screen, GREEN, self.pos, (self.pos + self.vel.normalize() * scale), 5
+        )
         # desired
         pg.draw.line(self.screen, RED, self.pos, (self.pos + self.desired * scale), 5)
         # target

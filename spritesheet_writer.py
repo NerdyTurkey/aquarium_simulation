@@ -84,7 +84,9 @@ output_frame_width, output_frame_height = (
 )
 
 print(f"frame width, height = {output_frame_width}, {output_frame_height}")
-print(f"overall width, height = {NUM_COLS * output_frame_width}, {NUM_ROWS * output_frame_height}")
+print(
+    f"overall width, height = {NUM_COLS * output_frame_width}, {NUM_ROWS * output_frame_height}"
+)
 
 for i in range(1, 7):
     print(i)
@@ -115,14 +117,18 @@ for i in range(1, 7):
                     frame = pg.transform.rotozoom(frame, 0, SCALE_FACTOR)
                     if direction == "right":
                         frame = pg.transform.flip(frame, True, False)
-                    if colour=="blue" and direction=="left" and j==0: print(key2, frame.get_size())
+                    if colour == "blue" and direction == "left" and j == 0:
+                        print(key2, frame.get_size())
                     output_spritesheet.blit(
                         frame, (j * output_frame_width, row * output_frame_height)
                     )
                     frames.append(frame)
                 row += 1
                 fish_frames[key2] = cycle(frames)
-    pg.image.save(output_spritesheet, os.path.join(WRITE_DIR, WRITE_FNAME_STEM + fish_num + ".png"))
+    pg.image.save(
+        output_spritesheet,
+        os.path.join(WRITE_DIR, WRITE_FNAME_STEM + fish_num + ".png"),
+    )
 
 
 duration = 500

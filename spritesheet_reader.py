@@ -29,19 +29,19 @@ NUM_COLS = max(NUM_FRAMES)
 # FRAME_W, FRAME_H = 444, 283
 # IMAGE_SIZES = {"1": (376, 283), "2": (295, 253), "3": (396, 269), "4": (216, 149), "5": (444, 281), "6": (318, 280)}
 
-# # half size
-# DIR = os.path.join("fish spritesheets", "half size")
-# SPRITESHEET_FNAME_STEM = "fish_spritesheet_half_size_0"
-# FRAME_W, FRAME_H = 222, 141
-# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
-# IMAGE_SIZES = {
-#     "1": (188, 141),
-#     "2": (147, 126),
-#     "3": (198, 134),
-#     "4": (108, 74),
-#     "5": (222, 140),
-#     "6": (159, 140),
-# }
+# half size
+DIR = os.path.join("fish spritesheets", "half size")
+SPRITESHEET_FNAME_STEM = "fish_spritesheet_half_size_0"
+FRAME_W, FRAME_H = 222, 141
+# frame size is constant, but image sizes within frame vary (but toplefts aligned)
+IMAGE_SIZES = {
+    "1": (188, 141),
+    "2": (147, 126),
+    "3": (198, 134),
+    "4": (108, 74),
+    "5": (222, 140),
+    "6": (159, 140),
+}
 
 # # third size
 # DIR = os.path.join("fish spritesheets", "third size")
@@ -57,12 +57,19 @@ NUM_COLS = max(NUM_FRAMES)
 # # frame size is constant, but image sizes within frame vary (but toplefts aligned)
 # IMAGE_SIZES = {"1": (94, 70), "2": (73, 63), "3": (99, 67), "4": (54, 37), "5": (111, 70), "6": (79, 70)}
 
-# fifth size
-DIR = os.path.join("fish spritesheets", "fifth size")
-SPRITESHEET_FNAME_STEM = "fish_spritesheet_fifth_size_0"
-FRAME_W, FRAME_H = 88, 56
-# frame size is constant, but image sizes within frame vary (but toplefts aligned)
-IMAGE_SIZES = {"1": (75, 56), "2": (59, 50), "3": (79, 53), "4": (43, 29), "5": (88, 56), "6": (63, 56)}
+# # fifth size
+# DIR = os.path.join("fish spritesheets", "fifth size")
+# SPRITESHEET_FNAME_STEM = "fish_spritesheet_fifth_size_0"
+# FRAME_W, FRAME_H = 88, 56
+# # frame size is constant, but image sizes within frame vary (but toplefts aligned)
+# IMAGE_SIZES = {
+#     "1": (75, 56),
+#     "2": (59, 50),
+#     "3": (79, 53),
+#     "4": (43, 29),
+#     "5": (88, 56),
+#     "6": (63, 56),
+# }
 
 
 # # eighth size
