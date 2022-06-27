@@ -1,4 +1,4 @@
-from random import randrange, uniform
+from random import randrange, uniform, choices, randint
 import pygame as pg
 from steer_combiner import combined_steer
 from angle_clamper import clamp_angle_to_horizontal
@@ -19,6 +19,10 @@ BEHAVIOUR_COLOURS = {"wander": "blue", "seek": "green", "evade": "red"}
 SF = 200
 
 
+def lerp(a, b, f):
+    return a + (b - a) * f
+
+
 class Agent(pg.sprite.Sprite):
     def __init__(self, screen, sprite_group):
         self.groups = sprite_group
@@ -32,6 +36,7 @@ class Agent(pg.sprite.Sprite):
         self.mass = 0.5  # mass might change after eating
         self.max_angle_with_horizontal = 45  # degrees
         self.max_force = 0.5
+        # TODO need to see how this max_speed interacts with the state-dependent max_speeds
         self.max_speed = 2
         self.wander_ring_radius = 50
         self.wander_ring_distance = 100
@@ -52,6 +57,20 @@ class Agent(pg.sprite.Sprite):
         self.rect = self.image.get_rect(center=self.pos)
 
         self.targets = {"seek": {}, "evade": {}}
+
+        # state handling
+        # TODO better as single dictionary of state-dependent properties?
+        self.transition_accel_duration = 1000
+        self.prob_of_state = {"hover": 0.45, "swim": 0.45, "dart": 0.1}
+        self.min_duration_of_state = {"hover": 2000, "swim": 2000, "dart": 500}
+        self.max_duration_of_state = {"hover": 10000, "swim": 10000, "dart": 1000}
+        self.min_speed_of_state = {"hover": 0.1, "swim": 0.5, "dart": 2.0}
+        self.max_speed_of_state = {"hover": 0.2, "swim": 1.0, "dart": 4.0}
+
+        self.state = "swim"
+        self.duration_of_current_state = randint(self.min_duration_of_state[self.state], self.max_duration_of_state[self.state])
+        self.time_of_last_state_change = pg.time.get_ticks()
+        self.transitioning = False
 
     def handle_walls(self, method="wrap"):
         if method == "wrap":
@@ -159,20 +178,52 @@ class Agent(pg.sprite.Sprite):
         force = total_steer + friction_force
         self.acc = force / self.mass
         self.vel += self.acc
-        if self.vel.length() > self.max_speed:
-            self.vel.scale_to_length(self.max_speed)
+
+        speed = self.vel.length()
+        if not self.transitioning and speed > self.max_speed_of_state[self.state]:
+            self.vel.scale_to_length(self.max_speed_of_state[self.state])
+        if speed < self.min_speed_of_state[self.state]:
+            self.vel.scale_to_length(self.min_speed_of_state[self.state])
         self.vel = clamp_angle_to_horizontal(self.vel, self.max_angle_with_horizontal)
         self.pos += self.vel
 
     def update_state(self):
-        pass
+        now = pg.time.get_ticks()
+        if (
+                not self.transitioning
+                and now - self.time_of_last_state_change > self.duration_of_current_state
+        ):
+            print("changing state...")
+            self.duration_of_current_state = randint(
+                self.min_duration_of_state[self.state], self.max_duration_of_state[self.state]
+            )
+            self.time_of_last_state_change = now
+            if self.state == "dart":
+                self.state = "swim"
+            else:
+                self.state = choices(
+                    ("swim", "hover", "dart"),
+                    weights=(self.prob_of_state["swim"], self.prob_of_state["hover"], self.prob_of_state["dart"]),
+                )[0]
+            if self.state == "dart":
+                self.duration_of_current_state *= 0.4  # darts are shorter duration
+            self.old_speed = self.vel.length()
+            self.new_speed = uniform(self.min_speed_of_state[self.state], self.max_speed_of_state[self.state])
+            self.transitioning = True
+        self.last_vel = vec(self.vel)
+        if self.transitioning:
+            frac = (now - self.time_of_last_state_change) / self.transition_accel_duration
+            easing_frac = 3 * frac * frac - 2 * frac * frac * frac
+            interp_speed = lerp(self.old_speed, self.new_speed, easing_frac)
+            self.vel.scale_to_length(interp_speed)
+            if frac >= 1:
+                self.transitioning = False
 
     def update_image(self):
         pass
 
-
     def update(self, *args, **kwargs):
-        # self.update_state()
+        self.update_state()
         self.update_physics()
         # self.update_image()
         self.handle_walls()
@@ -186,7 +237,7 @@ def main():
     screen = pg.display.set_mode((screen_width, screen_height))
     clock = pg.time.Clock()
     all_sprites = pg.sprite.Group()
-    num_fish = 10
+    num_fish = 50
     agents = []
     for _ in range(num_fish):
         agents.append(Agent(screen, all_sprites))
@@ -241,9 +292,9 @@ def main():
             all_sprites.update()
         all_sprites.draw(screen)
         for sprite in all_sprites:
-            sprite.draw_targets()
             if debug:
                 sprite.debug()
+                sprite.draw_targets()
         pg.display.set_caption(f"{clock.get_fps():.0f}")
         pg.display.flip()
     pg.quit()
