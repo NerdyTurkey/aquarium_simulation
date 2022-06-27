@@ -2,7 +2,15 @@ from random import randrange, uniform
 import pygame as pg
 from steer_combiner import combined_steer
 from angle_clamper import clamp_angle_to_horizontal
+"""
+Some testing of steer_combiner
 
+TODO:
+> speed changes (dart, hover) -- see wander.py, but also consider a new implementation
+> do we use invisible evade and seek targets to make the motion more interesting?
+> do we make fish evade and seek other types of fish?
+
+"""
 vec = pg.math.Vector2
 
 BOUNCE_MARGIN = 20
