@@ -5,13 +5,16 @@ from buffer_smooth import BufferSmooth
 
 vec = pg.math.Vector2
 
-WIDTH = 1200
-HEIGHT = 800
+SCREEN_WIDTH = 1200
+SCREEN_HEIGHT = 800
 FPS = 60
+
+BACKGROUND_COLOUR = "black"
+BOUNCE_MARGIN = 100  # for handling walls
 
 NUM_FISH = 50
 
-col_dict_short = {
+SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
     "blue": (0, 0, 255, 255),
     "brown": (165, 42, 42, 255),
@@ -44,47 +47,7 @@ col_dict_short = {
     "white": (255, 255, 255, 255),
     "yellow": (255, 255, 0, 255),
 }
-
-ALL_COLOURS = list(col_dict_short.values())
-
-WHITE = 255, 255, 255
-BLACK = 0, 0, 0
-RED = 255, 0, 0
-GREEN = 0, 255, 0
-BLUE = 0, 0, 255
-CYAN = 0, 255, 255
-YELLOW = 255, 255, 0
-DARKGRAY = 40, 40, 40
-
-BACKGROUND_COLOUR = BLACK
-
-BOUNCE_MARGIN = 100
-
-# To avoid problem with Vector2 normalize and scale to length vcrashing with very small vectors
-MIN_LENGTH = 1e-5
-
-
-# TODO make these class attributes (using a dict?)
-# Fish properties; will be different for different types of fish
-# speeds are in pix/s
-MIN_SPEED = {"hover": 6, "swim": 30, "dart": 120}
-MAX_SPEED = {"hover": 15, "swim": 60, "dart": 240}
-# should these be state-dependent?
-MAX_ANGLE_WITH_HORIZONTAL = 20  # degrees
-MIN_STATE_DURATION = 2000
-MAX_STATE_DURATION = 10000
-ACCELERATION_DURATION = 2000
-PROB_SWIM = 0.45
-PROB_HOVER = 0.45
-PROB_DART = 0.1
-FRICTION = 1
-
-# wander steering params
-MAX_FORCE = 0.4
-RAND_TARGET_TIME = 200
-WANDER_RING_DISTANCE = 400
-WANDER_RING_RADIUS = 50
-
+COLOURS = list(SOME_COLOURS.values())
 
 def lerp(a, b, f):
     return a + (b - a) * f
@@ -100,70 +63,110 @@ def clamp_angle_to_horizontal(v, max_angle_deg):
 
 
 class Bubble(pg.sprite.Sprite):
-    pass
+    ...
 
 
 class Fish(pg.sprite.Sprite):
-    def __init__(self, screen, sprite_group):
+    DEFAULT_PARAMS = {
+        # appearance
+        "body_width": None,
+        "body_height": None,
+        "colour": None,
+
+        # physics
+        "max_force": 0.4,
+        "min_speed": {"hover": 6, "swim": 30, "dart": 120},
+        "max_speed": {"hover": 15, "swim": 60, "dart": 240},
+        "max_angle_with_horizontal": 20,  # degrees
+
+        # state changes
+        "min_state_duration": 2000,
+        "max_state_duration": 10000,
+        "acceleration_duration": 2000,
+        "prob_swim": 0.45,
+        "prob_hover": 0.45,
+        "prob_dart": 0.1,
+
+        # wander steering params
+        "rand_target_time": 200,
+        "wander_ring_distance": 400,
+        "wander_ring_radius": 50,
+    }
+
+    def __init__(self, screen, sprite_group, **kwargs):
         self.groups = sprite_group
         pg.sprite.Sprite.__init__(self, self.groups)
-        body_width = randint(30, 50)
-        body_height = uniform(0.2, 0.8) * body_width
-        body = pg.Surface((body_width, body_height), pg.SRCALPHA)
-        body_rect = body.get_rect()
-        colour = choice(ALL_COLOURS)
-        pg.draw.ellipse(body, colour, body_rect)
-        eye_pos = vec(body_rect.midright) - vec(0.2 * body_width, 0)
-        tail_width = uniform(0.2, 0.5) * body_width
-        tail_height = body_height
-        tail = pg.Surface((tail_width, tail_height), pg.SRCALPHA)
-        tail_poly_pts = ((0, 0), (tail_width, 0.5 * tail_height), (0, tail_height))
-        pg.draw.circle(body, BLACK, eye_pos, 0.1 * body_width)
-        pg.draw.line(
-            body,
-            BLACK,
-            (body_rect.right, body_rect.centery + 5),
-            (body_rect.right - 0.2 * body_width, body_rect.centery + 5),
-            1,
-        )
-        pg.draw.polygon(tail, colour, tail_poly_pts)
-        self.image_right = pg.Surface(
-            (body_width + tail_width, body_height + tail_height), pg.SRCALPHA
-        )
-        self.image_right.blit(tail, (0, 0))
-        self.image_right.blit(body, (tail_width, 0))
-        self.image_left = pg.transform.flip(self.image_right, True, False)
         self.screen = screen
+        params = self.DEFAULT_PARAMS.copy()
+        filtered_params = {k: v for k, v in kwargs.items() if v is not None}
+        params.update(filtered_params)
+        self.__dict__.update(params)
+        if self.body_width is None:
+            self.body_width = randint(30, 50)
+        if self.body_height is None:
+            self.body_height = uniform(0.2, 0.8) * self.body_width
+        if self.colour is None:
+            self.colour = choice(COLOURS)
+        self.create_images()
+        self.pos = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.state = "swim"
-        self.pos = vec(randint(0, WIDTH), randint(0, HEIGHT))
-        self.vel = vec(uniform(MIN_SPEED[self.state], MAX_SPEED[self.state]), 0).rotate(
-            uniform(0, 360)
-        )
+        self.vel = vec(
+            uniform(self.min_speed[self.state], self.max_speed[self.state]), 0
+        ).rotate(uniform(0, 360))
         self.image = self.image_right
         self.rect = self.image.get_rect()
         self.acc = vec(0, 0)
         self.rect.center = self.pos
         self.last_update = 0
-        self.target = vec(randint(0, WIDTH), randint(0, HEIGHT))
-        self.duration_of_current_state = randint(MIN_STATE_DURATION, MAX_STATE_DURATION)
+        self.target = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
+        self.duration_of_current_state = randint(
+            self.min_state_duration, self.max_state_duration
+        )
         self.time_of_last_state_change = pg.time.get_ticks()
         self.transitioning = False
 
+    def create_images(self):
+        body = pg.Surface((self.body_width, self.body_height), pg.SRCALPHA)
+        body_rect = body.get_rect()
+        pg.draw.ellipse(body, self.colour, body_rect)
+        eye_pos = vec(body_rect.midright) - vec(0.2 * self.body_width, 0)
+        tail_width = uniform(0.2, 0.5) * self.body_width
+        tail_height = self.body_height
+        tail = pg.Surface((tail_width, tail_height), pg.SRCALPHA)
+        tail_poly_pts = ((0, 0), (tail_width, 0.5 * tail_height), (0, tail_height))
+        pg.draw.circle(body, "black", eye_pos, 0.1 * self.body_width)
+        pg.draw.line(
+            body,
+            "black",
+            (body_rect.right, body_rect.centery + 5),
+            (body_rect.right - 0.2 * self.body_width, body_rect.centery + 5),
+            1,
+        )
+        pg.draw.polygon(tail, self.colour, tail_poly_pts)
+        self.image_right = pg.Surface(
+            (self.body_width + tail_width, self.body_height + tail_height), pg.SRCALPHA
+        )
+        self.image_right.blit(tail, (0, 0))
+        self.image_right.blit(body, (tail_width, 0))
+        self.image_left = pg.transform.flip(self.image_right, True, False)
+
     def seek(self, target):
-        self.desired = (target - self.pos).normalize() * MAX_SPEED[
+        self.desired = (target - self.pos).normalize() * self.max_speed[
             self.state
         ]  # for vector plotting only
         steer = self.desired - self.vel
-        if steer.length() > MAX_FORCE:
-            steer.scale_to_length(MAX_FORCE)
+        if steer.length() > self.max_force:
+            steer.scale_to_length(self.max_force)
         return steer
 
     def wander(self):
         now = pg.time.get_ticks()
-        if now - self.last_update > RAND_TARGET_TIME:
+        if now - self.last_update > self.rand_target_time:
             self.last_update = now
-            future = self.pos + self.vel.normalize() * WANDER_RING_DISTANCE
-            self.target = future + vec(WANDER_RING_RADIUS, 0).rotate(uniform(0, 360))
+            future = self.pos + self.vel.normalize() * self.wander_ring_distance
+            self.target = future + vec(self.wander_ring_radius, 0).rotate(
+                uniform(0, 360)
+            )
         return self.seek(self.target)
 
     def handle_walls(self, method="turn"):
@@ -171,17 +174,17 @@ class Fish(pg.sprite.Sprite):
             hw = 0.5 * self.rect.w
             hh = 0.5 * self.rect.h
             if self.pos.x < -hw:
-                self.pos.x = WIDTH + hw
-            elif self.pos.x > WIDTH + hw:
+                self.pos.x = SCREEN_WIDTH + hw
+            elif self.pos.x > SCREEN_WIDTH + hw:
                 self.pos.x = -hw
             if self.pos.y < -hh:
-                self.pos.y = HEIGHT + hh
-            elif self.pos.y > HEIGHT + hh:
+                self.pos.y = SCREEN_HEIGHT + hh
+            elif self.pos.y > SCREEN_HEIGHT + hh:
                 self.pos.y = -hh
         elif method == "turn":
-            if not (-BOUNCE_MARGIN <= self.pos.x <= WIDTH + BOUNCE_MARGIN):
+            if not (-BOUNCE_MARGIN <= self.pos.x <= SCREEN_WIDTH + BOUNCE_MARGIN):
                 self.vel.x = -self.vel.x
-                if not (-BOUNCE_MARGIN <= self.pos.y <= HEIGHT + BOUNCE_MARGIN):
+                if not (-BOUNCE_MARGIN <= self.pos.y <= SCREEN_HEIGHT + BOUNCE_MARGIN):
                     self.vel.y = -self.vel.y
 
     def update(self, dt):
@@ -193,7 +196,7 @@ class Fish(pg.sprite.Sprite):
         ):
             # print("changing state...")
             self.duration_of_current_state = randint(
-                MIN_STATE_DURATION, MAX_STATE_DURATION
+                self.min_state_duration, self.max_state_duration
             )
             self.time_of_last_state_change = now
             if self.state == "dart":
@@ -201,29 +204,31 @@ class Fish(pg.sprite.Sprite):
             else:
                 self.state = choices(
                     ("swim", "hover", "dart"),
-                    weights=(PROB_SWIM, PROB_HOVER, PROB_DART),
+                    weights=(self.prob_swim, self.prob_hover, self.prob_dart),
                 )[0]
             if self.state == "dart":
                 self.duration_of_current_state *= 0.4  # darts are shorter duration
             self.old_speed = self.vel.length()
-            self.new_speed = uniform(MIN_SPEED[self.state], MAX_SPEED[self.state])
+            self.new_speed = uniform(
+                self.min_speed[self.state], self.max_speed[self.state]
+            )
             self.transitioning = True
         self.last_vel = vec(self.vel)
         self.acc = self.wander()
         self.vel += self.acc * dt
         if self.transitioning:
-            frac = (now - self.time_of_last_state_change) / ACCELERATION_DURATION
+            frac = (now - self.time_of_last_state_change) / self.acceleration_duration
             easing_frac = 3 * frac * frac - 2 * frac * frac * frac
             interp_speed = lerp(self.old_speed, self.new_speed, easing_frac)
             self.vel.scale_to_length(interp_speed)
             if frac >= 1:
                 self.transitioning = False
         speed = self.vel.length()
-        if not self.transitioning and speed > MAX_SPEED[self.state]:
-            self.vel.scale_to_length(MAX_SPEED[self.state])
-        if speed < MIN_SPEED[self.state]:
-            self.vel.scale_to_length(MIN_SPEED[self.state])
-        self.vel = clamp_angle_to_horizontal(self.vel, MAX_ANGLE_WITH_HORIZONTAL)
+        if not self.transitioning and speed > self.max_speed[self.state]:
+            self.vel.scale_to_length(self.max_speed[self.state])
+        if speed < self.min_speed[self.state]:
+            self.vel.scale_to_length(self.min_speed[self.state])
+        self.vel = clamp_angle_to_horizontal(self.vel, self.max_angle_with_horizontal)
         self.pos += self.vel * dt
         self.handle_walls(method="wrap")
         if self.vel.x >= 0:
@@ -232,33 +237,26 @@ class Fish(pg.sprite.Sprite):
             self.image = self.image_left
         self.rect.center = self.pos
 
-
     def draw_vectors(self):
         # acceleration indicator
         if self.transitioning:
-            pg.draw.circle(self.screen, WHITE, self.pos, 50, 5)
+            pg.draw.circle(self.screen, "white", self.pos, 50, 5)
         scale = 50
         # vel
         pg.draw.line(
-            self.screen, GREEN, self.pos, (self.pos + self.vel.normalize() * scale), 5
+            self.screen, "green", self.pos, (self.pos + self.vel.normalize() * scale), 5
         )
         # desired
-        pg.draw.line(self.screen, RED, self.pos, (self.pos + self.desired * scale), 5)
+        pg.draw.line(self.screen, "red", self.pos, (self.pos + self.desired * scale), 5)
         # target
-        center = self.pos + self.vel.normalize() * WANDER_RING_DISTANCE
-        pg.draw.circle(
-            self.screen,
-            WHITE,
-            center,
-            WANDER_RING_RADIUS,
-            1
-        )
-        pg.draw.line(self.screen, CYAN, center, self.target, 5)
+        center = self.pos + self.vel.normalize() * self.wander_ring_distance
+        pg.draw.circle(self.screen, "white", center, self.wander_ring_radius, 1)
+        pg.draw.line(self.screen, "cyan", center, self.target, 5)
 
 
 def main():
     pg.init()
-    screen = pg.display.set_mode((WIDTH, HEIGHT))
+    screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pg.time.Clock()
     all_sprites = pg.sprite.Group()
     for _ in range(NUM_FISH):

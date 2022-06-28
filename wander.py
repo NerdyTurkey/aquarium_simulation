@@ -166,7 +166,7 @@ class Fish(pg.sprite.Sprite):
         body_height = 50  # uniform(0.2, 0.8) * body_width
         body = pg.Surface((body_width, body_height), pg.SRCALPHA)
         body_rect = body.get_rect()
-        colour = "cyan"  # choice(ALL_COLOURS)
+        colour = "cyan"  # choice(COLOURS)
         pg.draw.ellipse(body, colour, body_rect)
         eye_pos = vec(body_rect.midright) - vec(0.2 * body_width, 0)
         tail_width = uniform(0.2, 0.5) * body_width
@@ -391,7 +391,7 @@ class Fish(pg.sprite.Sprite):
             center,
             WANDER_RING_RADIUS,
             1
-            # self.screen, WHITE, (int(center.x), int(center.y)), WANDER_RING_RADIUS, 1
+            # self.screen, WHITE, (int(center.x), int(center.y)), wander_ring_radius, 1
         )
         pg.draw.line(self.screen, CYAN, center, self.target, 5)
 

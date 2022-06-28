@@ -2,6 +2,7 @@ from random import randrange, uniform, choices, randint
 import pygame as pg
 from steer_combiner import combined_steer
 from angle_clamper import clamp_angle_to_horizontal
+
 """
 Some testing of steer_combiner
 
@@ -68,7 +69,10 @@ class Agent(pg.sprite.Sprite):
         self.max_speed_of_state = {"hover": 0.2, "swim": 1.0, "dart": 4.0}
 
         self.state = "swim"
-        self.duration_of_current_state = randint(self.min_duration_of_state[self.state], self.max_duration_of_state[self.state])
+        self.duration_of_current_state = randint(
+            self.min_duration_of_state[self.state],
+            self.max_duration_of_state[self.state],
+        )
         self.time_of_last_state_change = pg.time.get_ticks()
         self.transitioning = False
 
@@ -105,7 +109,11 @@ class Agent(pg.sprite.Sprite):
     def debug(self):
         for behaviour, steer in self.steers:
             pg.draw.line(
-                self.screen, BEHAVIOUR_COLOURS[behaviour], self.pos, self.pos + SF * steer, 5
+                self.screen,
+                BEHAVIOUR_COLOURS[behaviour],
+                self.pos,
+                self.pos + SF * steer,
+                5,
             )
             if behaviour == "seek":
                 pg.draw.circle(
@@ -173,7 +181,7 @@ class Agent(pg.sprite.Sprite):
                     )
         total_steer, self.steers = combined_steer(params, priority_ordered_info)
         friction_force = (
-                -self.friction_coeff * self.vel.length_squared() * total_steer.normalize()
+            -self.friction_coeff * self.vel.length_squared() * total_steer.normalize()
         )
         force = total_steer + friction_force
         self.acc = force / self.mass
@@ -190,12 +198,13 @@ class Agent(pg.sprite.Sprite):
     def update_state(self):
         now = pg.time.get_ticks()
         if (
-                not self.transitioning
-                and now - self.time_of_last_state_change > self.duration_of_current_state
+            not self.transitioning
+            and now - self.time_of_last_state_change > self.duration_of_current_state
         ):
             print("changing state...")
             self.duration_of_current_state = randint(
-                self.min_duration_of_state[self.state], self.max_duration_of_state[self.state]
+                self.min_duration_of_state[self.state],
+                self.max_duration_of_state[self.state],
             )
             self.time_of_last_state_change = now
             if self.state == "dart":
@@ -203,16 +212,24 @@ class Agent(pg.sprite.Sprite):
             else:
                 self.state = choices(
                     ("swim", "hover", "dart"),
-                    weights=(self.prob_of_state["swim"], self.prob_of_state["hover"], self.prob_of_state["dart"]),
+                    weights=(
+                        self.prob_of_state["swim"],
+                        self.prob_of_state["hover"],
+                        self.prob_of_state["dart"],
+                    ),
                 )[0]
             if self.state == "dart":
                 self.duration_of_current_state *= 0.4  # darts are shorter duration
             self.old_speed = self.vel.length()
-            self.new_speed = uniform(self.min_speed_of_state[self.state], self.max_speed_of_state[self.state])
+            self.new_speed = uniform(
+                self.min_speed_of_state[self.state], self.max_speed_of_state[self.state]
+            )
             self.transitioning = True
         self.last_vel = vec(self.vel)
         if self.transitioning:
-            frac = (now - self.time_of_last_state_change) / self.transition_accel_duration
+            frac = (
+                now - self.time_of_last_state_change
+            ) / self.transition_accel_duration
             easing_frac = 3 * frac * frac - 2 * frac * frac * frac
             interp_speed = lerp(self.old_speed, self.new_speed, easing_frac)
             self.vel.scale_to_length(interp_speed)
@@ -270,7 +287,7 @@ def main():
                                 ),
                                 "weight": uniform(0.5, 10),
                             },
-                            )
+                        )
                     target_counter += 1
                 if event.key == pg.K_e:
                     # add evade target
@@ -285,7 +302,7 @@ def main():
                                 ),
                                 "weight": 1,
                             },
-                            )
+                        )
                     target_counter += 1
         screen.fill("black")
         if not paused:
