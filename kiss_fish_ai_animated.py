@@ -3,6 +3,8 @@ import pygame as pg
 from random import random, randint, uniform, choice, choices
 from spritesheet_reader import get_frames
 
+# TODO: make different fish types (and maybe colours) have different properties
+# ie. physics, state changes, wander steering params
 
 vec = pg.math.Vector2
 
