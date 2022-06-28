@@ -49,6 +49,7 @@ SOME_COLOURS = {
     "yellow": (255, 255, 0, 255),
 }
 
+
 COLOURS = list(SOME_COLOURS.values())
 
 
