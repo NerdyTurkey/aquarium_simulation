@@ -12,7 +12,8 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 50
+NUM_FISH = 1
+DS = 100
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -50,6 +51,7 @@ SOME_COLOURS = {
 
 COLOURS = list(SOME_COLOURS.values())
 
+
 def lerp(a, b, f):
     return a + (b - a) * f
 
@@ -73,13 +75,11 @@ class Fish(pg.sprite.Sprite):
         "body_width": None,
         "body_height": None,
         "colour": None,
-
         # physics
         "max_force": 0.4,
         "min_speed": {"hover": 6, "swim": 30, "dart": 120},
         "max_speed": {"hover": 15, "swim": 60, "dart": 240},
         "max_angle_with_horizontal": 20,  # degrees
-
         # state changes
         "min_state_duration": 2000,
         "max_state_duration": 10000,
@@ -87,7 +87,6 @@ class Fish(pg.sprite.Sprite):
         "prob_swim": 0.45,
         "prob_hover": 0.45,
         "prob_dart": 0.1,
-
         # wander steering params
         "rand_target_time": 200,
         "wander_ring_distance": 400,
@@ -125,6 +124,7 @@ class Fish(pg.sprite.Sprite):
         )
         self.time_of_last_state_change = pg.time.get_ticks()
         self.transitioning = False
+        self.s = 0  # total distance travelled
 
     def create_images(self):
         body = pg.Surface((self.body_width, self.body_height), pg.SRCALPHA)
@@ -225,6 +225,10 @@ class Fish(pg.sprite.Sprite):
             if frac >= 1:
                 self.transitioning = False
         speed = self.vel.length()
+        self.s += speed * dt
+        if self.s >= DS:
+            print(f"{now} travelled {DS}")
+            self.s = 0
         if not self.transitioning and speed > self.max_speed[self.state]:
             self.vel.scale_to_length(self.max_speed[self.state])
         if speed < self.min_speed[self.state]:
@@ -277,7 +281,7 @@ def main():
                     paused = not paused
                 if event.key == pg.K_v:
                     show_vectors = not show_vectors
-                if event.key == pg.K_m:
+            if event.key == pg.K_m:
                     Fish(screen, all_sprites)
 
         screen.fill(BACKGROUND_COLOUR)
