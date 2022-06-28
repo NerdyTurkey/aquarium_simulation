@@ -122,6 +122,7 @@ def get_frames(size, verbose=True):
     potentially large numbers of fish.
 
     """
+
     size = size.upper()
     directory = SHEET_INFO[size]["DIR"]
     stem = SHEET_INFO[size]["STEM"]
