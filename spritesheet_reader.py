@@ -104,6 +104,7 @@ SHEET_INFO["EIGHTH"] = {
     },
 }
 
+
 def get_spritesheet_row(colour, state, direction):
     return (
         NUM_STATES * NUM_DIRECTIONS * COLOUR_INDEX[colour]
@@ -149,7 +150,8 @@ def get_frames(size, verbose=True):
                         frame = pg.Surface(image_sizes[fish_num], pg.SRCALPHA)
                         x, y = (
                             j * frame_width,
-                            get_spritesheet_row(colour, state, direction) * frame_height,
+                            get_spritesheet_row(colour, state, direction)
+                            * frame_height,
                         )
                         # print(x,y)
                         frame.blit(spritesheet, (-x, -y))

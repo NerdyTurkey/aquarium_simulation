@@ -1,6 +1,8 @@
 import math
 import pygame as pg
 from random import random, randint, uniform, choice, choices
+from spritesheet_reader import get_frames
+
 
 vec = pg.math.Vector2
 
@@ -11,8 +13,7 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 1
-DS = 100
+NUM_FISH = 200
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -70,15 +71,14 @@ class Bubble(pg.sprite.Sprite):
 
 class Fish(pg.sprite.Sprite):
     DEFAULT_PARAMS = {
-        # appearance
-        "body_width": None,
-        "body_height": None,
-        "colour": None,
+        # animation
+        "hover_frame_update_interval": 50,  # ms
+        "swim_dart_frame_update_distance": 5,  # pix
         # physics
         "max_force": 0.4,
         "min_speed": {"hover": 6, "swim": 30, "dart": 120},
         "max_speed": {"hover": 15, "swim": 60, "dart": 240},
-        "max_angle_with_horizontal": 20,  # degrees
+        "max_angle_with_horizontal": 10,  # degrees
         # state changes
         "min_state_duration": 2000,
         "max_state_duration": 10000,
@@ -92,63 +92,38 @@ class Fish(pg.sprite.Sprite):
         "wander_ring_radius": 50,
     }
 
-    def __init__(self, screen, sprite_group, **kwargs):
+    def __init__(self, screen, sprite_group, frames, **kwargs):
+        self.screen = screen
         self.groups = sprite_group
         pg.sprite.Sprite.__init__(self, self.groups)
-        self.screen = screen
+        self.frames = frames
         params = self.DEFAULT_PARAMS.copy()
         filtered_params = {k: v for k, v in kwargs.items() if v is not None}
         params.update(filtered_params)
         self.__dict__.update(params)
-        if self.body_width is None:
-            self.body_width = randint(30, 50)
-        if self.body_height is None:
-            self.body_height = uniform(0.2, 0.8) * self.body_width
-        if self.colour is None:
-            self.colour = choice(COLOURS)
-        self.create_images()
         self.pos = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.state = "swim"
         self.vel = vec(
             uniform(self.min_speed[self.state], self.max_speed[self.state]), 0
         ).rotate(uniform(0, 360))
-        self.image = self.image_right
+        if self.vel.x >= 0:
+            self.image = next(self.frames[self.state]["right"])
+        else:
+            self.image = next(self.frames[self.state]["left"])
         self.rect = self.image.get_rect()
         self.acc = vec(0, 0)
+        # self.rect.topleft = self.pos  # TODO this might need to be center?
         self.rect.center = self.pos
         self.last_update = 0
         self.target = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.duration_of_current_state = randint(
             self.min_state_duration, self.max_state_duration
         )
-        self.time_of_last_state_change = pg.time.get_ticks()
+        now = pg.time.get_ticks()
+        self.time_of_last_state_change = now
+        self.last_hover_frame_update = now
         self.transitioning = False
-        self.s = 0  # total distance travelled
-
-    def create_images(self):
-        body = pg.Surface((self.body_width, self.body_height), pg.SRCALPHA)
-        body_rect = body.get_rect()
-        pg.draw.ellipse(body, self.colour, body_rect)
-        eye_pos = vec(body_rect.midright) - vec(0.2 * self.body_width, 0)
-        tail_width = uniform(0.2, 0.5) * self.body_width
-        tail_height = self.body_height
-        tail = pg.Surface((tail_width, tail_height), pg.SRCALPHA)
-        tail_poly_pts = ((0, 0), (tail_width, 0.5 * tail_height), (0, tail_height))
-        pg.draw.circle(body, "black", eye_pos, 0.1 * self.body_width)
-        pg.draw.line(
-            body,
-            "black",
-            (body_rect.right, body_rect.centery + 5),
-            (body_rect.right - 0.2 * self.body_width, body_rect.centery + 5),
-            1,
-        )
-        pg.draw.polygon(tail, self.colour, tail_poly_pts)
-        self.image_right = pg.Surface(
-            (self.body_width + tail_width, self.body_height + tail_height), pg.SRCALPHA
-        )
-        self.image_right.blit(tail, (0, 0))
-        self.image_right.blit(body, (tail_width, 0))
-        self.image_left = pg.transform.flip(self.image_right, True, False)
+        self.distance = 0  # total distance travelled
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * self.max_speed[
@@ -224,10 +199,7 @@ class Fish(pg.sprite.Sprite):
             if frac >= 1:
                 self.transitioning = False
         speed = self.vel.length()
-        self.s += speed * dt
-        if self.s >= DS:
-            print(f"{now} travelled {DS}")
-            self.s = 0
+        self.distance += speed * dt
         if not self.transitioning and speed > self.max_speed[self.state]:
             self.vel.scale_to_length(self.max_speed[self.state])
         if speed < self.min_speed[self.state]:
@@ -235,10 +207,25 @@ class Fish(pg.sprite.Sprite):
         self.vel = clamp_angle_to_horizontal(self.vel, self.max_angle_with_horizontal)
         self.pos += self.vel * dt
         self.handle_walls(method="wrap")
-        if self.vel.x >= 0:
-            self.image = self.image_right
-        else:
-            self.image = self.image_left
+        if (
+            self.state == "hover"
+            and now - self.last_hover_frame_update > self.hover_frame_update_interval
+        ):
+            self.last_hover_frame_update = now
+            if self.vel.x >= 0:
+                self.image = next(self.frames["hover"]["right"])
+            else:
+                self.image = next(self.frames["hover"]["left"])
+        elif (
+            self.state in ["swim", "dart"]
+            and self.distance > self.swim_dart_frame_update_distance
+        ):
+            self.distance = 0
+            if self.vel.x >= 0:
+                self.image = next(self.frames[self.state]["right"])
+            else:
+                self.image = next(self.frames[self.state]["left"])
+        # self.rect.topleft = self.pos  # TODO this might need to be center?
         self.rect.center = self.pos
 
     def draw_vectors(self):
@@ -265,7 +252,30 @@ def main():
     clock = pg.time.Clock()
     all_sprites = pg.sprite.Group()
     for _ in range(NUM_FISH):
-        Fish(screen, all_sprites)
+        # key = str(i) + "_" + colour + "_" + state + "_" + direction
+        fish_type = str(randint(1, 6))
+        fish_colour = choice(("blue", "green", "orange", "pink", "red", "yellow"))
+        hover_left_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
+        hover_right_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
+        swim_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
+        swim_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        dart_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
+        dart_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        frames = {
+            "hover": {
+                "left": fish_frames[hover_left_key],
+                "right": fish_frames[hover_right_key],
+            },
+            "swim": {
+                "left": fish_frames[swim_left_key],
+                "right": fish_frames[swim_right_key],
+            },
+            "dart": {
+                "left": fish_frames[dart_left_key],
+                "right": fish_frames[dart_right_key],
+            },
+        }
+        Fish(screen, all_sprites, frames)
     paused = False
     show_vectors = False
     running = True
@@ -281,8 +291,6 @@ def main():
                     paused = not paused
                 if event.key == pg.K_v:
                     show_vectors = not show_vectors
-            if event.key == pg.K_m:
-                Fish(screen, all_sprites)
 
         screen.fill(BACKGROUND_COLOUR)
         if not paused:
