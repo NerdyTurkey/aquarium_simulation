@@ -47,6 +47,7 @@ SOME_COLOURS = {
     "white": (255, 255, 255, 255),
     "yellow": (255, 255, 0, 255),
 }
+
 COLOURS = list(SOME_COLOURS.values())
 
 def lerp(a, b, f):
