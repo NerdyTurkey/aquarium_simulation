@@ -267,7 +267,7 @@ def main():
     show_vectors = False
     running = True
     while running:
-        dt = clock.tick(FPS) # ms
+        dt = clock.tick(FPS)  # ms
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
