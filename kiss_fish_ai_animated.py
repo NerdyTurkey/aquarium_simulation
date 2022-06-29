@@ -276,6 +276,7 @@ def main():
     clock = pg.time.Clock()
     pg.mouse.set_visible(False)
     all_sprites = pg.sprite.Group()
+
     cursor = pg.sprite.Sprite()
     cursor.radius = 5
     cursor.image = pg.Surface((2 * cursor.radius, 2 * cursor.radius), pg.SRCALPHA)
