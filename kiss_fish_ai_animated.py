@@ -2,6 +2,8 @@ import math
 import pygame as pg
 from random import random, randint, uniform, choice, choices
 from spritesheet_reader import get_frames
+from fish_properties import fish_properties
+from pprint import pprint
 
 # TODO: make different fish types (and maybe colours) have different properties
 # ie. physics, state changes, wander steering params
@@ -15,7 +17,7 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 200
+NUM_FISH = 10
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -79,8 +81,12 @@ class Fish(pg.sprite.Sprite):
         "swim_dart_frame_update_distance": 5,  # pix
         # physics
         "max_force": 0.4,
-        "min_speed": {"hover": 6, "swim": 30, "dart": 120},
-        "max_speed": {"hover": 15, "swim": 60, "dart": 240},
+        "min_speed_hover": 6,
+        "min_speed_swim": 30,
+        "min_speed_dart": 120,
+        "max_speed_hover": 15,
+        "max_speed_swim": 60,
+        "max_speed_dart":240,
         "max_angle_with_horizontal": 10,  # degrees
         # state changes
         "min_state_duration": 2000,
@@ -106,6 +112,8 @@ class Fish(pg.sprite.Sprite):
         self.__dict__.update(params)
         self.pos = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.state = "swim"
+        self.min_speed = {"hover": self.min_speed_hover, "swim": self.min_speed_swim, "dart": self.min_speed_dart}
+        self.max_speed = {"hover": self.max_speed_hover, "swim": self.max_speed_swim, "dart": self.max_speed_dart}
         self.vel = vec(
             uniform(self.min_speed[self.state], self.max_speed[self.state]), 0
         ).rotate(uniform(0, 360))
@@ -120,13 +128,16 @@ class Fish(pg.sprite.Sprite):
         self.last_update = 0
         self.target = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.duration_of_current_state = randint(
-            self.min_state_duration, self.max_state_duration
+            int(self.min_state_duration), int(self.max_state_duration)
         )
         now = pg.time.get_ticks()
         self.time_of_last_state_change = now
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
+        print("\nIn Fish init:")
+        pprint(self.__dict__)
+
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * self.max_speed[
@@ -174,7 +185,7 @@ class Fish(pg.sprite.Sprite):
         ):
             # print("changing state...")
             self.duration_of_current_state = randint(
-                self.min_state_duration, self.max_state_duration
+                int(self.min_state_duration), int(self.max_state_duration)
             )
             self.time_of_last_state_change = now
             if self.state == "dart":
@@ -257,6 +268,14 @@ def main():
     for _ in range(NUM_FISH):
         # key = str(i) + "_" + colour + "_" + state + "_" + direction
         fish_type = str(randint(1, 6))
+        fish_props_ranges = fish_properties[fish_type]
+        fish_props = {}
+        for k, v in fish_props_ranges.items():
+            if isinstance(v, (list, tuple)) and len(v) == 2:
+                fish_props[k] = uniform(v[0], v[1])
+            else:
+                fish_props[k] = v
+        # pprint(fish_props)
         fish_colour = choice(("blue", "green", "orange", "pink", "red", "yellow"))
         hover_left_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
         hover_right_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
@@ -278,7 +297,7 @@ def main():
                 "right": fish_frames[dart_right_key],
             },
         }
-        Fish(screen, all_sprites, frames)
+        Fish(screen, all_sprites, frames, **fish_props)
     paused = False
     show_vectors = False
     running = True
