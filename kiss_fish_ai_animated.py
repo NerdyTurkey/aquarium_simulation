@@ -5,9 +5,6 @@ from spritesheet_reader import get_frames
 from fish_properties import fish_properties
 from pprint import pprint
 
-# TODO: make different fish types (and maybe colours) have different properties
-# ie. physics, state changes, wander steering params
-
 vec = pg.math.Vector2
 
 SCREEN_WIDTH = 1200
@@ -17,7 +14,7 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 100
+NUM_FISH = 50
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -267,31 +264,26 @@ class Fish(pg.sprite.Sprite):
                     self.image = next(self.frames["chomp"]["left"])
                 else:
                     self.image = next(self.frames[self.state]["left"])
+        # for collision detection using pg.sprite.collide_circle
+        # 0.2 found by trial and error
+        self.radius = 0.2 * sum(self.image.get_size())
         self.rect.center = self.pos
-
-    def draw_vectors(self):
-        # acceleration indicator
-        if self.transitioning:
-            pg.draw.circle(self.screen, "white", self.pos, 50, 5)
-        scale = 50
-        # vel
-        pg.draw.line(
-            self.screen, "green", self.pos, (self.pos + self.vel.normalize() * scale), 5
-        )
-        # desired
-        pg.draw.line(self.screen, "red", self.pos, (self.pos + self.desired * scale), 5)
-        # target
-        center = self.pos + self.vel.normalize() * self.wander_ring_distance
-        pg.draw.circle(self.screen, "white", center, self.wander_ring_radius, 1)
-        pg.draw.line(self.screen, "cyan", center, self.target, 5)
 
 
 def main():
-    fish_frames = get_frames("FIFTH")
     pg.init()
     screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pg.time.Clock()
+    pg.mouse.set_visible(False)
     all_sprites = pg.sprite.Group()
+    cursor = pg.sprite.Sprite()
+    cursor.radius = 5
+    cursor.image = pg.Surface((2 * cursor.radius, 2 * cursor.radius), pg.SRCALPHA)
+    pg.draw.circle(
+        cursor.image, "white", (cursor.radius, cursor.radius), cursor.radius, 1
+    )
+    cursor.rect = cursor.image.get_rect()
+    fish_frames = get_frames("FIFTH")
     for _ in range(NUM_FISH):
         # key = str(i) + "_" + colour + "_" + state + "_" + direction
         fish_type = str(randint(1, 6))
@@ -339,29 +331,37 @@ def main():
             }
         Fish(screen, all_sprites, frames, **fish_props)
     paused = False
-    show_vectors = False
+    show_hitboxes = False
     running = True
     while running:
+        cursor.rect.center = pg.mouse.get_pos()
         dt = clock.tick(FPS)  # ms
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
+            if event.type == pg.MOUSEBUTTONUP:
+                hit_sprites = pg.sprite.spritecollide(
+                    cursor, all_sprites, False, pg.sprite.collide_circle
+                )
+                for sprite in hit_sprites:
+                    sprite.kill()
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
                     running = False
                 if event.key == pg.K_SPACE:
                     paused = not paused
-                if event.key == pg.K_v:
-                    show_vectors = not show_vectors
+                if event.key == pg.K_h:
+                    show_hitboxes = not show_hitboxes
 
         screen.fill(BACKGROUND_COLOUR)
         if not paused:
             all_sprites.update(0.001 * dt)
         pg.display.set_caption(f"{clock.get_fps():.0f}")
         all_sprites.draw(screen)
-        if show_vectors:
-            for sprite in all_sprites:
-                sprite.draw_vectors()
+        if show_hitboxes:
+            for s in all_sprites:
+                pg.draw.circle(screen, "white", s.rect.center, s.radius, 1)
+        screen.blit(cursor.image, cursor.rect)
         pg.display.flip()
     pg.quit()
 
