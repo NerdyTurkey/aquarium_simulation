@@ -29,6 +29,8 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),
@@ -57,6 +59,8 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),
@@ -85,13 +89,15 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),
         "wander_ring_radius": (30, 70),
     },
     "4": {
-        "description": "large, tired, fedup",
+        "description": "large, tired, fed up",
         # animation
         "has_chomp": False,
         "hover_frame_update_interval": (45, 55),  # ms
@@ -113,6 +119,8 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),
@@ -141,6 +149,8 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),
@@ -169,6 +179,8 @@ fish_properties = {
         "prob_swim": (0.4, 0.5),
         "prob_hover": (0.4, 0.50),
         "prob_dart": (0.05, 0.15),
+        # modifiers
+        "prob_chomp": (0.1, 0.3),
         # wander steering params
         "rand_target_time": (150, 250),
         "wander_ring_distance": (300, 500),

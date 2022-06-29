@@ -17,7 +17,7 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 10
+NUM_FISH = 100
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -86,7 +86,7 @@ class Fish(pg.sprite.Sprite):
         "min_speed_dart": 120,
         "max_speed_hover": 15,
         "max_speed_swim": 60,
-        "max_speed_dart":240,
+        "max_speed_dart": 240,
         "max_angle_with_horizontal": 10,  # degrees
         # state changes
         "min_state_duration": 2000,
@@ -95,6 +95,8 @@ class Fish(pg.sprite.Sprite):
         "prob_swim": 0.45,
         "prob_hover": 0.45,
         "prob_dart": 0.1,
+        # modifiers
+        "prob_chomp": 0.2,
         # wander steering params
         "rand_target_time": 200,
         "wander_ring_distance": 400,
@@ -112,8 +114,17 @@ class Fish(pg.sprite.Sprite):
         self.__dict__.update(params)
         self.pos = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
         self.state = "swim"
-        self.min_speed = {"hover": self.min_speed_hover, "swim": self.min_speed_swim, "dart": self.min_speed_dart}
-        self.max_speed = {"hover": self.max_speed_hover, "swim": self.max_speed_swim, "dart": self.max_speed_dart}
+        self.modifier = None
+        self.min_speed = {
+            "hover": self.min_speed_hover,
+            "swim": self.min_speed_swim,
+            "dart": self.min_speed_dart,
+        }
+        self.max_speed = {
+            "hover": self.max_speed_hover,
+            "swim": self.max_speed_swim,
+            "dart": self.max_speed_dart,
+        }
         self.vel = vec(
             uniform(self.min_speed[self.state], self.max_speed[self.state]), 0
         ).rotate(uniform(0, 360))
@@ -123,7 +134,6 @@ class Fish(pg.sprite.Sprite):
             self.image = next(self.frames[self.state]["left"])
         self.rect = self.image.get_rect()
         self.acc = vec(0, 0)
-        # self.rect.topleft = self.pos  # TODO this might need to be center?
         self.rect.center = self.pos
         self.last_update = 0
         self.target = vec(randint(0, SCREEN_WIDTH), randint(0, SCREEN_HEIGHT))
@@ -135,9 +145,8 @@ class Fish(pg.sprite.Sprite):
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
-        print("\nIn Fish init:")
-        pprint(self.__dict__)
-
+        # print("\nIn Fish init:")
+        # pprint(self.__dict__)
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * self.max_speed[
@@ -184,6 +193,11 @@ class Fish(pg.sprite.Sprite):
             and now - self.time_of_last_state_change > self.duration_of_current_state
         ):
             # print("changing state...")
+            # modifiers change behaviour of a state (they are not a state in their own right)
+            # currently only have a chomp modifier (mouth opening and closing)
+            self.modifier = choices(
+                (None, "chomp"), weights=(self.prob_chomp, 1 - self.prob_chomp)
+            )[0]
             self.duration_of_current_state = randint(
                 int(self.min_state_duration), int(self.max_state_duration)
             )
@@ -227,19 +241,32 @@ class Fish(pg.sprite.Sprite):
         ):
             self.last_hover_frame_update = now
             if self.vel.x >= 0:
-                self.image = next(self.frames["hover"]["right"])
+                # confusingly, not all fish types have chomp frames,
+                # so we need to check if it has_chomp before checking modifier flag
+                if self.has_chomp and self.modifier == "chomp":
+                    self.image = next(self.frames["chomp"]["right"])
+                else:
+                    self.image = next(self.frames["hover"]["right"])
             else:
-                self.image = next(self.frames["hover"]["left"])
+                if self.has_chomp and self.modifier == "chomp":
+                    self.image = next(self.frames["chomp"]["left"])
+                else:
+                    self.image = next(self.frames["hover"]["left"])
         elif (
             self.state in ["swim", "dart"]
             and self.distance > self.swim_dart_frame_update_distance
         ):
             self.distance = 0
             if self.vel.x >= 0:
-                self.image = next(self.frames[self.state]["right"])
+                if self.has_chomp and self.modifier == "chomp":
+                    self.image = next(self.frames["chomp"]["right"])
+                else:
+                    self.image = next(self.frames[self.state]["right"])
             else:
-                self.image = next(self.frames[self.state]["left"])
-        # self.rect.topleft = self.pos  # TODO this might need to be center?
+                if self.has_chomp and self.modifier == "chomp":
+                    self.image = next(self.frames["chomp"]["left"])
+                else:
+                    self.image = next(self.frames[self.state]["left"])
         self.rect.center = self.pos
 
     def draw_vectors(self):
@@ -277,12 +304,19 @@ def main():
                 fish_props[k] = v
         # pprint(fish_props)
         fish_colour = choice(("blue", "green", "orange", "pink", "red", "yellow"))
+        # dictionary keys (not keyboard keys!)
         hover_left_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
         hover_right_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
         swim_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
         swim_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
         dart_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
         dart_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        chomp_left_key = (
+            fish_type + "_" + fish_colour + "_" + "swim-chomp" + "_" + "left"
+        )
+        chomp_right_key = (
+            fish_type + "_" + fish_colour + "_" + "swim-chomp" + "_" + "right"
+        )
         frames = {
             "hover": {
                 "left": fish_frames[hover_left_key],
@@ -297,6 +331,12 @@ def main():
                 "right": fish_frames[dart_right_key],
             },
         }
+        # not all fish types have chomp frames
+        if fish_props["has_chomp"]:
+            frames["chomp"] = {
+                "left": fish_frames[chomp_left_key],
+                "right": fish_frames[chomp_right_key],
+            }
         Fish(screen, all_sprites, frames, **fish_props)
     paused = False
     show_vectors = False

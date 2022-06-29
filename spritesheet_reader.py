@@ -3,7 +3,7 @@ from itertools import cycle
 import pygame as pg
 
 WIDTH, HEIGHT = 900, 600
-FPS = 60
+FPS = 10
 
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -21,7 +21,7 @@ DIRECTIONS = ("left", "right")
 DIRECTION_INDEX = {dirn: i for i, dirn in enumerate(DIRECTIONS)}
 NUM_DIRECTIONS = len(DIRECTIONS)
 
-NUM_FRAMES = (20, 16, 20)
+NUM_FRAMES = (20, 16, 16)
 NUM_COLS = max(NUM_FRAMES)
 
 SHEET_INFO = {}
@@ -162,9 +162,9 @@ def get_frames(size, verbose=True):
 
 def main():
     # check animations
-    size = "eighth"
+    size = "fifth"
     fish_frames = get_frames(size)
-    duration = 400
+    duration = 2000
     blit_topleft = 100, 100
     for i in range(1, 7):
         for colour in COLOURS:
