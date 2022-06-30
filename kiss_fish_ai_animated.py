@@ -14,7 +14,7 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 50
+NUM_FISH = 10
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -65,6 +65,16 @@ def clamp_angle_to_horizontal(v, max_angle_deg):
     return vec(
         v.x, math.copysign(abs(v.x) * math.tan(math.radians(max_angle_deg)), v.y)
     )
+
+
+def get_outline_image(img, colour="white", linewidth=5, sf=1.4):
+    mask = pg.mask.from_surface(img)
+    outline = mask.outline()
+    dw, dh = 2 * linewidth, 2*linewidth
+    outline = [(dw//2 + p[0], dh//2 + p[1]) for p in outline]
+    outline_img = pg.Surface(img.get_rect().inflate(dw, dh).size, pg.SRCALPHA)
+    pg.draw.polygon(outline_img, colour, outline, linewidth)
+    return pg.transform.rotozoom(outline_img, 0, sf)
 
 
 class Bubble(pg.sprite.Sprite):
@@ -130,6 +140,7 @@ class Fish(pg.sprite.Sprite):
         else:
             self.image = next(self.frames[self.state]["left"])
         self.rect = self.image.get_rect()
+        self.outline_image = get_outline_image(self.image)
         self.acc = vec(0, 0)
         self.rect.center = self.pos
         self.last_update = 0
@@ -142,6 +153,7 @@ class Fish(pg.sprite.Sprite):
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
+        self.show_outline = False
         # print("\nIn Fish init:")
         # pprint(self.__dict__)
 
@@ -345,7 +357,8 @@ def main():
                     cursor, all_sprites, False, pg.sprite.collide_circle
                 )
                 for sprite in hit_sprites:
-                    sprite.kill()
+                    sprite.show_outline = not sprite.show_outline
+                    # sprite.kill()
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
                     running = False
@@ -360,8 +373,11 @@ def main():
         pg.display.set_caption(f"{clock.get_fps():.0f}")
         all_sprites.draw(screen)
         if show_hitboxes:
-            for s in all_sprites:
-                pg.draw.circle(screen, "white", s.rect.center, s.radius, 1)
+            for sprite in all_sprites:
+                if sprite.show_outline:
+                    outline_rect = sprite.outline_image.get_rect(center=sprite.rect.center)
+                    screen.blit(sprite.outline_image, outline_rect)
+                pg.draw.circle(screen, "white", sprite.rect.center, sprite.radius, 1)
         screen.blit(cursor.image, cursor.rect)
         pg.display.flip()
     pg.quit()
