@@ -14,7 +14,19 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-NUM_FISH = 10
+
+MAX_NUM_FISH = 50
+# TODO make these type dependent
+MIN_MAX_NUM_PAIRS = {
+    "1": (1, 4),
+    "2": (1, 4),
+    "3": (1, 4),
+    "4": (1, 4),
+    "5": (1, 4),
+    "6": (1, 4),
+}
+
+MAX_SELECTED_FISH = 2
 
 SOME_COLOURS = {
     "beige": (245, 245, 220, 255),
@@ -54,6 +66,13 @@ SOME_COLOURS = {
 COLOURS = list(SOME_COLOURS.values())
 
 
+def filter_by_occurrences(alist, occurrences=1):
+    """
+    Returns alist keeping only elements that appear <= occurrences
+    """
+    return [i for i in alist if alist.count(i) <= occurrences]
+
+
 def lerp(a, b, f):
     return a + (b - a) * f
 
@@ -67,11 +86,11 @@ def clamp_angle_to_horizontal(v, max_angle_deg):
     )
 
 
-def get_outline_image(img, colour="white", linewidth=5, sf=1.4):
+def get_outline_image(img, colour="white", linewidth=1, sf=1.4):
     mask = pg.mask.from_surface(img)
     outline = mask.outline()
-    dw, dh = 2 * linewidth, 2*linewidth
-    outline = [(dw//2 + p[0], dh//2 + p[1]) for p in outline]
+    dw, dh = 2 * linewidth, 2 * linewidth
+    outline = [(dw // 2 + p[0], dh // 2 + p[1]) for p in outline]
     outline_img = pg.Surface(img.get_rect().inflate(dw, dh).size, pg.SRCALPHA)
     pg.draw.polygon(outline_img, colour, outline, linewidth)
     return pg.transform.rotozoom(outline_img, 0, sf)
@@ -110,11 +129,12 @@ class Fish(pg.sprite.Sprite):
         "wander_ring_radius": 50,
     }
 
-    def __init__(self, screen, sprite_group, frames, **kwargs):
+    def __init__(self, screen, sprite_group, frames, id, **kwargs):
         self.screen = screen
         self.groups = sprite_group
         pg.sprite.Sprite.__init__(self, self.groups)
         self.frames = frames
+        self.id = id
         params = self.DEFAULT_PARAMS.copy()
         filtered_params = {k: v for k, v in kwargs.items() if v is not None}
         params.update(filtered_params)
@@ -135,12 +155,15 @@ class Fish(pg.sprite.Sprite):
         self.vel = vec(
             uniform(self.min_speed[self.state], self.max_speed[self.state]), 0
         ).rotate(uniform(0, 360))
+        image_left = next(self.frames[self.state]["left"])
+        image_right = next(self.frames[self.state]["right"])
+        # self.outline_image_left = get_outline_image(image_left)
+        # self.outline_image_right = get_outline_image(image_right)
         if self.vel.x >= 0:
-            self.image = next(self.frames[self.state]["right"])
+            self.image = image_right
         else:
-            self.image = next(self.frames[self.state]["left"])
-        self.rect = self.image.get_rect()
-        self.outline_image = get_outline_image(self.image)
+            self.image = image_left
+        self.rect = self.image.get_rect()  # same size for left and right
         self.acc = vec(0, 0)
         self.rect.center = self.pos
         self.last_update = 0
@@ -153,7 +176,9 @@ class Fish(pg.sprite.Sprite):
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
-        self.show_outline = False
+        self.selected = False
+        self.selection_ring_radius = self.rect.w // 2 + 10
+        # self.show_outline = False
         # print("\nIn Fish init:")
         # pprint(self.__dict__)
 
@@ -286,7 +311,10 @@ def main():
     pg.init()
     screen = pg.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     clock = pg.time.Clock()
+
     pg.mouse.set_visible(False)
+    fish_sprites = pg.sprite.Group()
+    bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
 
     cursor = pg.sprite.Sprite()
@@ -296,8 +324,10 @@ def main():
         cursor.image, "white", (cursor.radius, cursor.radius), cursor.radius, 1
     )
     cursor.rect = cursor.image.get_rect()
+
     fish_frames = get_frames("FIFTH")
-    for _ in range(NUM_FISH):
+    num_fish = 0
+    while True:
         # key = str(i) + "_" + colour + "_" + state + "_" + direction
         fish_type = str(randint(1, 6))
         fish_props_ranges = fish_properties[fish_type]
@@ -309,43 +339,57 @@ def main():
                 fish_props[k] = v
         # pprint(fish_props)
         fish_colour = choice(("blue", "green", "orange", "pink", "red", "yellow"))
-        # dictionary keys (not keyboard keys!)
-        hover_left_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
-        hover_right_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
-        swim_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
-        swim_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
-        dart_left_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
-        dart_right_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
-        chomp_left_key = (
+        hover_left_dict_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
+        hover_right_dict_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
+        swim_left_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
+        swim_right_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        dart_left_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
+        dart_right_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        chomp_left_dict_key = (
             fish_type + "_" + fish_colour + "_" + "swim-chomp" + "_" + "left"
         )
-        chomp_right_key = (
+        chomp_right_dict_key = (
             fish_type + "_" + fish_colour + "_" + "swim-chomp" + "_" + "right"
         )
         frames = {
             "hover": {
-                "left": fish_frames[hover_left_key],
-                "right": fish_frames[hover_right_key],
+                "left": fish_frames[hover_left_dict_key],
+                "right": fish_frames[hover_right_dict_key],
             },
             "swim": {
-                "left": fish_frames[swim_left_key],
-                "right": fish_frames[swim_right_key],
+                "left": fish_frames[swim_left_dict_key],
+                "right": fish_frames[swim_right_dict_key],
             },
             "dart": {
-                "left": fish_frames[dart_left_key],
-                "right": fish_frames[dart_right_key],
+                "left": fish_frames[dart_left_dict_key],
+                "right": fish_frames[dart_right_dict_key],
             },
         }
         # not all fish types have chomp frames
         if fish_props["has_chomp"]:
             frames["chomp"] = {
-                "left": fish_frames[chomp_left_key],
-                "right": fish_frames[chomp_right_key],
+                "left": fish_frames[chomp_left_dict_key],
+                "right": fish_frames[chomp_right_dict_key],
             }
-        Fish(screen, all_sprites, frames, **fish_props)
+        id = fish_type + "_" + fish_colour
+        num_pairs = randint(*MIN_MAX_NUM_PAIRS[fish_type])
+        for i in range(num_pairs):
+            num_fish += 2
+            Fish(screen, fish_sprites, frames, id, **fish_props)
+            Fish(screen, fish_sprites, frames, id, **fish_props)
+            if num_fish >= MAX_NUM_FISH:
+                break
+        if num_fish >= MAX_NUM_FISH:
+            break
+
+    print(f"{num_fish=}")
+
+    all_sprites.add(fish_sprites)
     paused = False
     show_hitboxes = False
     running = True
+    num_fish_selected = 0
+    selected_fishes = {}
     while running:
         cursor.rect.center = pg.mouse.get_pos()
         dt = clock.tick(FPS)  # ms
@@ -353,11 +397,22 @@ def main():
             if event.type == pg.QUIT:
                 running = False
             if event.type == pg.MOUSEBUTTONUP:
-                hit_sprites = pg.sprite.spritecollide(
-                    cursor, all_sprites, False, pg.sprite.collide_circle
+                hit_fishes = pg.sprite.spritecollide(
+                    cursor, fish_sprites, False, pg.sprite.collide_circle
                 )
-                for sprite in hit_sprites:
-                    sprite.show_outline = not sprite.show_outline
+                for fish in hit_fishes:
+                    id = fish.id
+                    if fish.selected:
+                        selected_fishes[id].remove(fish)
+                        num_fish_selected -= 1
+                        fish.selected = False
+                    elif num_fish_selected < MAX_SELECTED_FISH:
+                        if id not in selected_fishes:
+                            selected_fishes[id] = []
+                        selected_fishes[id].append(fish)
+                        num_fish_selected += 1
+                        fish.selected = True
+                    # sprite.show_outline = not sprite.show_outline
                     # sprite.kill()
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
@@ -367,17 +422,34 @@ def main():
                 if event.key == pg.K_h:
                     show_hitboxes = not show_hitboxes
 
+        # remove matched fish
+        selected_fishes_copy = selected_fishes.copy()
+        for id, fishes in selected_fishes.items():
+            if len(fishes) >= 2:
+                num_fish_selected -= len(fishes)
+                for fish in fishes:
+                    fish.kill()
+                selected_fishes_copy[id] = []
+        selected_fishes = selected_fishes_copy.copy()
+
         screen.fill(BACKGROUND_COLOUR)
         if not paused:
             all_sprites.update(0.001 * dt)
         pg.display.set_caption(f"{clock.get_fps():.0f}")
         all_sprites.draw(screen)
-        if show_hitboxes:
-            for sprite in all_sprites:
-                if sprite.show_outline:
-                    outline_rect = sprite.outline_image.get_rect(center=sprite.rect.center)
-                    screen.blit(sprite.outline_image, outline_rect)
-                pg.draw.circle(screen, "white", sprite.rect.center, sprite.radius, 1)
+        for fish in fish_sprites:
+            if fish.selected:
+                pg.draw.circle(
+                    screen, "yellow", fish.rect.center, fish.selection_ring_radius, 5
+                )
+                # if sprite.vel.x >= 0:
+                #     outline_image = sprite.outline_image_right
+                # else:
+                #     outline_image = sprite.outline_image_left
+                # outline_rect = outline_image.get_rect(center=sprite.rect.center)
+                # screen.blit(outline_image, outline_rect)
+            if show_hitboxes:
+                pg.draw.circle(screen, "white", fish.rect.center, fish.radius, 1)
         screen.blit(cursor.image, cursor.rect)
         pg.display.flip()
     pg.quit()

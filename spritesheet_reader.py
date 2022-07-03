@@ -2,12 +2,8 @@ import os
 from itertools import cycle
 import pygame as pg
 
-WIDTH, HEIGHT = 900, 600
-FPS = 10
 
 pg.init()
-screen = pg.display.set_mode((WIDTH, HEIGHT))
-clock = pg.time.Clock()
 
 COLOURS = ("blue", "green", "orange", "pink", "red", "yellow")
 COLOUR_INDEX = {col: i for i, col in enumerate(COLOURS)}
@@ -113,7 +109,7 @@ def get_spritesheet_row(colour, state, direction):
     )
 
 
-def get_frames(size, verbose=True):
+def get_frames(size, verbose=False):
     """
     Returns dictionary of cycled animation frames for requested size.
     Dictionary keys are:
@@ -161,10 +157,14 @@ def get_frames(size, verbose=True):
 
 
 def main():
+    width, height = 900, 600
+    fps = 60
+    screen = pg.display.set_mode((width, height))
+    clock = pg.time.Clock()
     # check animations
     size = "fifth"
     fish_frames = get_frames(size)
-    duration = 2000
+    duration = 500
     blit_topleft = 100, 100
     for i in range(1, 7):
         for colour in COLOURS:
@@ -180,7 +180,7 @@ def main():
                             if event.type == pg.KEYDOWN:
                                 if event.key == pg.K_ESCAPE:
                                     return
-                        clock.tick(FPS)
+                        clock.tick(fps)
                         screen.fill("black")
                         try:
                             frame = next(fish_frames[key])
