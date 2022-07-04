@@ -15,6 +15,7 @@ BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
 
+
 MAX_NUM_FISH = 50
 # TODO make these type dependent
 MIN_MAX_NUM_PAIRS = {
