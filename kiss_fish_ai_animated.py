@@ -1,4 +1,5 @@
 import math
+import numpy as np
 import pygame as pg
 from random import random, randint, uniform, choice, choices
 from spritesheet_reader import get_frames
@@ -101,9 +102,9 @@ class Bubble(pg.sprite.Sprite):
         "radius_min_max": (3, 5),
         "size_scale_factor": 1.0,
         "colour": "white",
-        "linewidth":1,
-        "speed_scale_factor":1.0,
-        "travel_distance": 100
+        "linewidth": 1,
+        "speed_scale_factor": 1.0,
+        "travel_distance": 100,
     }
 
     def __init__(self, sprite_group, pos, **kwargs):
@@ -115,14 +116,23 @@ class Bubble(pg.sprite.Sprite):
         self.__dict__.update(params)
         self.radius = randint(*self.radius_min_max)
         self.pos = vec(self.start_pos)
-        self.vel = vec(0, -self.size_scale_factor * 20 * self.radius**0.5)
-        self.image = pg.Surface((2*self.radius, 2*self.radius), pg.SRCALPHA)
-        pg.draw.circle(self.image, self.colour, (self.radius, self.radius), self.radius, self.linewidth)
+        self.vel = vec(0, -self.size_scale_factor * 20 * self.radius ** 0.5)
+        self.image = pg.Surface((2 * self.radius, 2 * self.radius), pg.SRCALPHA)
+        pg.draw.circle(
+            self.image,
+            self.colour,
+            (self.radius, self.radius),
+            self.radius,
+            self.linewidth,
+        )
         self.rect = self.image.get_rect(center=self.pos)
 
     def update(self, dt):
         self.pos += self.vel * dt
-        if self.pos.y < -self.radius or (self.pos - self.start_pos).length() > self.travel_distance:
+        if (
+            self.pos.y < -self.radius
+            or (self.pos - self.start_pos).length() > self.travel_distance
+        ):
             self.kill()
         else:
             self.rect.center = self.pos
@@ -355,13 +365,17 @@ def main():
     fish_sprites = pg.sprite.Group()
     bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
-
+    screen_filter = pg.image.load("undersea1.png").convert_alpha()
+    # screen_filter = pg.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pg.SRCALPHA)
+    # screen_filter.fill((0,0,255,100))
+    # undersea = pg.image.load("undersea2.png").convert_alpha()
+    # screen_filter.blit(undersea, (0,0))
 
     cursor = pg.sprite.Sprite()
-    cursor.radius = 5
+    cursor.radius = 10
     cursor.image = pg.Surface((2 * cursor.radius, 2 * cursor.radius), pg.SRCALPHA)
     pg.draw.circle(
-        cursor.image, "white", (cursor.radius, cursor.radius), cursor.radius, 1
+        cursor.image, "yellow", (cursor.radius, cursor.radius), cursor.radius, 3
     )
     cursor.rect = cursor.image.get_rect()
 
@@ -379,12 +393,20 @@ def main():
                 fish_props[k] = v
         # pprint(fish_props)
         fish_colour = choice(("blue", "green", "orange", "pink", "red", "yellow"))
-        hover_left_dict_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
-        hover_right_dict_key = fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
+        hover_left_dict_key = (
+            fish_type + "_" + fish_colour + "_" + "idle" + "_" + "left"
+        )
+        hover_right_dict_key = (
+            fish_type + "_" + fish_colour + "_" + "idle" + "_" + "right"
+        )
         swim_left_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
-        swim_right_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        swim_right_dict_key = (
+            fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        )
         dart_left_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "left"
-        dart_right_dict_key = fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        dart_right_dict_key = (
+            fish_type + "_" + fish_colour + "_" + "swim" + "_" + "right"
+        )
         chomp_left_dict_key = (
             fish_type + "_" + fish_colour + "_" + "swim-chomp" + "_" + "left"
         )
@@ -419,7 +441,6 @@ def main():
             Fish(screen, fish_sprites, frames, id, **fish_props)
         if num_fish >= MAX_NUM_FISH:
             break
-
 
     print(f"{num_fish=}")
 
@@ -479,7 +500,9 @@ def main():
         for fish in fish_sprites:
             if fish.bubbling:
                 if fish.bubble_times is None:
-                    fish.bubble_times = iter([now + 200*i for i in range(randint(1, 10))])
+                    fish.bubble_times = iter(
+                        [now + 200 * i for i in range(randint(1, 10))]
+                    )
                     fish.bd = next(fish.bubble_times)
                 if now >= fish.bd:
                     try:
@@ -520,6 +543,7 @@ def main():
                 pg.draw.circle(screen, "white", fish.rect.midright, 2)
                 pg.draw.circle(screen, "white", fish.rect.midleft, 2)
         screen.blit(cursor.image, cursor.rect)
+        screen.blit(screen_filter, (0, 0))
         pg.display.flip()
     pg.quit()
 
