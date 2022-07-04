@@ -14,9 +14,8 @@ FPS = 60
 BACKGROUND_COLOUR = "black"
 BOUNCE_MARGIN = 100  # for handling walls
 
-
-
 MAX_NUM_FISH = 50
+
 # TODO make these type dependent
 MIN_MAX_NUM_PAIRS = {
     "1": (1, 4),
@@ -104,16 +103,18 @@ class Bubble(pg.sprite.Sprite):
         "colour": "white",
         "linewidth":1,
         "speed_scale_factor":1.0,
+        "travel_distance": 100
     }
 
     def __init__(self, sprite_group, pos, **kwargs):
         pg.sprite.Sprite.__init__(self, sprite_group)
-        self.pos = vec(pos)
+        self.start_pos = vec(pos)
         params = self.DEFAULT_PARAMS.copy()
         filtered_params = {k: v for k, v in kwargs.items() if v is not None}
         params.update(filtered_params)
         self.__dict__.update(params)
         self.radius = randint(*self.radius_min_max)
+        self.pos = vec(self.start_pos)
         self.vel = vec(0, -self.size_scale_factor * 20 * self.radius**0.5)
         self.image = pg.Surface((2*self.radius, 2*self.radius), pg.SRCALPHA)
         pg.draw.circle(self.image, self.colour, (self.radius, self.radius), self.radius, self.linewidth)
@@ -121,7 +122,7 @@ class Bubble(pg.sprite.Sprite):
 
     def update(self, dt):
         self.pos += self.vel * dt
-        if self.pos.y < -self.radius:
+        if self.pos.y < -self.radius or (self.pos - self.start_pos).length() > self.travel_distance:
             self.kill()
         else:
             self.rect.center = self.pos
@@ -200,8 +201,9 @@ class Fish(pg.sprite.Sprite):
         now = pg.time.get_ticks()
         self.time_of_last_state_change = now
         self.time_of_last_bubble = now
-        self.bubble = False
+        self.bubbling = False
         self.bubble_interval = randint(2000, 5000)
+        self.bubble_times = None
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
@@ -251,11 +253,14 @@ class Fish(pg.sprite.Sprite):
     def update(self, dt):
         """ dt is frame time step in seconds """
         now = pg.time.get_ticks()
+
         # bubbles
         if now - self.time_of_last_bubble > self.bubble_interval:
-            self.bubble = True
+            self.bubbling = True
             self.time_of_last_bubble = now
             self.bubble_interval = randint(2000, 5000)
+
+        # state changes
         if (
             not self.transitioning
             and now - self.time_of_last_state_change > self.duration_of_current_state
@@ -470,15 +475,26 @@ def main():
 
         screen.fill(BACKGROUND_COLOUR)
 
+        now = pg.time.get_ticks()
         for fish in fish_sprites:
-            if fish.bubble:
-                if fish.vel.x >= 0:
-                    bubble_pos = fish.rect.midright
-                else:
-                    bubble_pos = fish.rect.midleft
-                Bubble(bubble_sprites, bubble_pos)
-                fish.bubble = False
+            if fish.bubbling:
+                if fish.bubble_times is None:
+                    fish.bubble_times = iter([now + 200*i for i in range(randint(1, 10))])
+                    fish.bd = next(fish.bubble_times)
+                if now >= fish.bd:
+                    try:
+                        fish.bd = next(fish.bubble_times)
+                        if fish.vel.x >= 0:
+                            bubble_pos = fish.rect.midright
+                        else:
+                            bubble_pos = fish.rect.midleft
+                        Bubble(bubble_sprites, bubble_pos)
+                    except StopIteration:
+                        fish.bubbling = False
+                        fish.bubble_times = None
+
         all_sprites.add(fish_sprites, bubble_sprites)
+
         #  update
         if not paused:
             all_sprites.update(0.001 * dt)
