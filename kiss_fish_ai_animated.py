@@ -97,7 +97,33 @@ def get_outline_image(img, colour="white", linewidth=1, sf=1.4):
 
 
 class Bubble(pg.sprite.Sprite):
-    ...
+    DEFAULT_PARAMS = {
+        "radius_min_max": (3, 5),
+        "size_scale_factor": 1.0,
+        "colour": "white",
+        "linewidth":1,
+        "speed_scale_factor":1.0,
+    }
+
+    def __init__(self, sprite_group, pos, **kwargs):
+        pg.sprite.Sprite.__init__(self, sprite_group)
+        self.pos = vec(pos)
+        params = self.DEFAULT_PARAMS.copy()
+        filtered_params = {k: v for k, v in kwargs.items() if v is not None}
+        params.update(filtered_params)
+        self.__dict__.update(params)
+        self.radius = randint(*self.radius_min_max)
+        self.vel = vec(0, -self.size_scale_factor * 20 * self.radius**0.5)
+        self.image = pg.Surface((2*self.radius, 2*self.radius), pg.SRCALPHA)
+        pg.draw.circle(self.image, self.colour, (self.radius, self.radius), self.radius, self.linewidth)
+        self.rect = self.image.get_rect(center=self.pos)
+
+    def update(self, dt):
+        self.pos += self.vel * dt
+        if self.pos.y < -self.radius:
+            self.kill()
+        else:
+            self.rect.center = self.pos
 
 
 class Fish(pg.sprite.Sprite):
@@ -131,8 +157,7 @@ class Fish(pg.sprite.Sprite):
 
     def __init__(self, screen, sprite_group, frames, id, **kwargs):
         self.screen = screen
-        self.groups = sprite_group
-        pg.sprite.Sprite.__init__(self, self.groups)
+        pg.sprite.Sprite.__init__(self, sprite_group)
         self.frames = frames
         self.id = id
         params = self.DEFAULT_PARAMS.copy()
@@ -173,6 +198,9 @@ class Fish(pg.sprite.Sprite):
         )
         now = pg.time.get_ticks()
         self.time_of_last_state_change = now
+        self.time_of_last_bubble = now
+        self.bubble = False
+        self.bubble_interval = randint(2000, 5000)
         self.last_hover_frame_update = now
         self.transitioning = False
         self.distance = 0  # total distance travelled
@@ -222,6 +250,11 @@ class Fish(pg.sprite.Sprite):
     def update(self, dt):
         """ dt is frame time step in seconds """
         now = pg.time.get_ticks()
+        # bubbles
+        if now - self.time_of_last_bubble > self.bubble_interval:
+            self.bubble = True
+            self.time_of_last_bubble = now
+            self.bubble_interval = randint(2000, 5000)
         if (
             not self.transitioning
             and now - self.time_of_last_state_change > self.duration_of_current_state
@@ -317,6 +350,7 @@ def main():
     bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
 
+
     cursor = pg.sprite.Sprite()
     cursor.radius = 5
     cursor.image = pg.Surface((2 * cursor.radius, 2 * cursor.radius), pg.SRCALPHA)
@@ -377,16 +411,15 @@ def main():
             num_fish += 2
             Fish(screen, fish_sprites, frames, id, **fish_props)
             Fish(screen, fish_sprites, frames, id, **fish_props)
-            if num_fish >= MAX_NUM_FISH:
-                break
         if num_fish >= MAX_NUM_FISH:
             break
 
+
     print(f"{num_fish=}")
 
-    all_sprites.add(fish_sprites)
     paused = False
     show_hitboxes = False
+    show_mouths = False
     running = True
     num_fish_selected = 0
     selected_fishes = {}
@@ -417,10 +450,12 @@ def main():
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
                     running = False
-                if event.key == pg.K_SPACE:
+                elif event.key == pg.K_SPACE:
                     paused = not paused
-                if event.key == pg.K_h:
+                elif event.key == pg.K_h:
                     show_hitboxes = not show_hitboxes
+                elif event.key == pg.K_m:
+                    show_mouths = not show_mouths
 
         # remove matched fish
         selected_fishes_copy = selected_fishes.copy()
@@ -433,9 +468,23 @@ def main():
         selected_fishes = selected_fishes_copy.copy()
 
         screen.fill(BACKGROUND_COLOUR)
+
+        for fish in fish_sprites:
+            if fish.bubble:
+                if fish.vel.x >= 0:
+                    bubble_pos = fish.rect.midright
+                else:
+                    bubble_pos = fish.rect.midleft
+                Bubble(bubble_sprites, bubble_pos)
+                fish.bubble = False
+        all_sprites.add(fish_sprites, bubble_sprites)
+        #  update
         if not paused:
             all_sprites.update(0.001 * dt)
         pg.display.set_caption(f"{clock.get_fps():.0f}")
+        if len(fish_sprites) == 0:
+            running = False
+        # draw
         all_sprites.draw(screen)
         for fish in fish_sprites:
             if fish.selected:
@@ -450,6 +499,9 @@ def main():
                 # screen.blit(outline_image, outline_rect)
             if show_hitboxes:
                 pg.draw.circle(screen, "white", fish.rect.center, fish.radius, 1)
+            if show_mouths:
+                pg.draw.circle(screen, "white", fish.rect.midright, 2)
+                pg.draw.circle(screen, "white", fish.rect.midleft, 2)
         screen.blit(cursor.image, cursor.rect)
         pg.display.flip()
     pg.quit()
