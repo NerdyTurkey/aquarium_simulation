@@ -365,11 +365,23 @@ def main():
     fish_sprites = pg.sprite.Group()
     bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
+
+    # Type 1
     screen_filter = pg.image.load("undersea1.png").convert_alpha()
+
+    # Type 2
     # screen_filter = pg.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pg.SRCALPHA)
     # screen_filter.fill((0,0,255,100))
     # undersea = pg.image.load("undersea2.png").convert_alpha()
     # screen_filter.blit(undersea, (0,0))
+
+
+    # For scrolling background
+    bx1, by1 = 0, 0
+    bx2, by2 = -SCREEN_WIDTH, 0
+    bv = 2
+    bimg1 = pg.image.load("underseaT1.png").convert_alpha()
+    bimg2 = pg.image.load("underseaT2.png").convert_alpha()
 
     cursor = pg.sprite.Sprite()
     cursor.radius = 10
@@ -542,8 +554,20 @@ def main():
             if show_mouths:
                 pg.draw.circle(screen, "white", fish.rect.midright, 2)
                 pg.draw.circle(screen, "white", fish.rect.midleft, 2)
+        # Scrolling background
+        bx1 += bv
+        bx2 += bv
+        screen.blit(bimg1, (bx1, by1))
+        screen.blit(bimg2,(bx2, by2))
+        if bx1 >= SCREEN_WIDTH:
+            bx1 = -SCREEN_WIDTH
+        if bx2 >= SCREEN_WIDTH:
+            bx2 = -SCREEN_WIDTH
+
+        # Non scrolling background
+        # screen.blit(screen_filter, (0, 0))
+
         screen.blit(cursor.image, cursor.rect)
-        screen.blit(screen_filter, (0, 0))
         pg.display.flip()
     pg.quit()
 
