@@ -375,13 +375,12 @@ def main():
     # undersea = pg.image.load("undersea2.png").convert_alpha()
     # screen_filter.blit(undersea, (0,0))
 
-
     # For scrolling background
-    bx1, by1 = 0, 0
-    bx2, by2 = -SCREEN_WIDTH, 0
-    bv = 2
-    bimg1 = pg.image.load("underseaT1.png").convert_alpha()
-    bimg2 = pg.image.load("underseaT2.png").convert_alpha()
+    bgnd_x1, bgnd_y1 = 0, 0
+    bgnd_x2, bgnd_y2 = -SCREEN_WIDTH, 0
+    bgnd_vel = 60  # pixels/s
+    bgnd_img1 = pg.image.load("underseaT1.png").convert_alpha()
+    bgnd_img2 = pg.image.load("underseaT2.png").convert_alpha()
 
     cursor = pg.sprite.Sprite()
     cursor.radius = 10
@@ -464,7 +463,7 @@ def main():
     selected_fishes = {}
     while running:
         cursor.rect.center = pg.mouse.get_pos()
-        dt = clock.tick(FPS)  # ms
+        dt = 0.001 * clock.tick(FPS)  # sec
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 running = False
@@ -532,7 +531,7 @@ def main():
 
         #  update
         if not paused:
-            all_sprites.update(0.001 * dt)
+            all_sprites.update(dt)
         pg.display.set_caption(f"{clock.get_fps():.0f}")
         if len(fish_sprites) == 0:
             running = False
@@ -555,14 +554,16 @@ def main():
                 pg.draw.circle(screen, "white", fish.rect.midright, 2)
                 pg.draw.circle(screen, "white", fish.rect.midleft, 2)
         # Scrolling background
-        bx1 += bv
-        bx2 += bv
-        screen.blit(bimg1, (bx1, by1))
-        screen.blit(bimg2,(bx2, by2))
-        if bx1 >= SCREEN_WIDTH:
-            bx1 = -SCREEN_WIDTH
-        if bx2 >= SCREEN_WIDTH:
-            bx2 = -SCREEN_WIDTH
+        bgnd_x1 += int(bgnd_vel * dt)
+        bgnd_x2 += int(bgnd_vel * dt)
+        dx1 = bgnd_x1 - SCREEN_WIDTH
+        dx2 = bgnd_x2 - SCREEN_WIDTH
+        if dx1 >= 0:
+            bgnd_x1 = -SCREEN_WIDTH + dx1
+        if dx2 >= 0:
+            bgnd_x2 = -SCREEN_WIDTH + dx2
+        screen.blit(bgnd_img1, (bgnd_x1, bgnd_y1))
+        screen.blit(bgnd_img2, (bgnd_x2, bgnd_y2))
 
         # Non scrolling background
         # screen.blit(screen_filter, (0, 0))
