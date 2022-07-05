@@ -4,6 +4,7 @@ import pygame as pg
 from random import random, randint, uniform, choice, choices
 from spritesheet_reader import get_frames
 from fish_properties import fish_properties
+import uuid
 from pprint import pprint
 
 vec = pg.math.Vector2
@@ -222,6 +223,7 @@ class Fish(pg.sprite.Sprite):
         # self.show_outline = False
         # print("\nIn Fish init:")
         # pprint(self.__dict__)
+        self.uuid = str(uuid.uuid4())[:8]
 
     def seek(self, target):
         self.desired = (target - self.pos).normalize() * self.max_speed[
@@ -279,8 +281,12 @@ class Fish(pg.sprite.Sprite):
             # modifiers change behaviour of a state (they are not a state in their own right)
             # currently only have a chomp modifier (mouth opening and closing)
             self.modifier = choices(
-                (None, "chomp"), weights=(self.prob_chomp, 1 - self.prob_chomp)
+                (None, "chomp"), weights=(1-self.prob_chomp, self.prob_chomp)
             )[0]
+            if self.modifier == "chomp":
+                print(f"{self.uuid} is chomping")
+            else:
+                print(f"{self.uuid} is not chomping")
             self.duration_of_current_state = randint(
                 int(self.min_state_duration), int(self.max_state_duration)
             )
@@ -366,23 +372,15 @@ def main():
     bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
 
-    # Type 1
-    screen_filter = pg.image.load("undersea1.png").convert_alpha()
-
-    # Type 2
-    # screen_filter = pg.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pg.SRCALPHA)
-    # screen_filter.fill((0,0,255,100))
-    # undersea = pg.image.load("undersea2.png").convert_alpha()
-    # screen_filter.blit(undersea, (0,0))
-
-    # For scrolling background
-    bgnd_x1, bgnd_y1 = 0, 0
-    bgnd_x2, bgnd_y2 = -SCREEN_WIDTH, 0
-    bgnd_vel = 60  # pixels/s
-    bgnd_img1 = pg.image.load("underseaT1.png").convert_alpha()
-    bgnd_img2 = pg.image.load("underseaT2.png").convert_alpha()
+    # For scrolling foreground "undersea" filter
+    filter_x1, filter_y1 = 0, 0
+    filter_x2, filter_y2 = -SCREEN_WIDTH, 0
+    filter_vel = 60  # pixels/s
+    filter_img1 = pg.image.load("underseaT1.png").convert_alpha()
+    filter_img2 = pg.image.load("underseaT2.png").convert_alpha()
 
     cursor = pg.sprite.Sprite()
+
     cursor.radius = 10
     cursor.image = pg.Surface((2 * cursor.radius, 2 * cursor.radius), pg.SRCALPHA)
     pg.draw.circle(
@@ -457,7 +455,6 @@ def main():
 
     paused = False
     show_hitboxes = False
-    show_mouths = False
     running = True
     num_fish_selected = 0
     selected_fishes = {}
@@ -492,8 +489,7 @@ def main():
                     paused = not paused
                 elif event.key == pg.K_h:
                     show_hitboxes = not show_hitboxes
-                elif event.key == pg.K_m:
-                    show_mouths = not show_mouths
+
 
         # remove matched fish
         selected_fishes_copy = selected_fishes.copy()
@@ -537,6 +533,19 @@ def main():
             running = False
         # draw
         all_sprites.draw(screen)
+
+        # Scrolling foreground filter
+        filter_x1 += int(filter_vel * dt)
+        filter_x2 += int(filter_vel * dt)
+        dx1 = filter_x1 - SCREEN_WIDTH
+        dx2 = filter_x2 - SCREEN_WIDTH
+        if dx1 >= 0:
+            filter_x1 = -SCREEN_WIDTH + dx1
+        if dx2 >= 0:
+            filter_x2 = -SCREEN_WIDTH + dx2
+        screen.blit(filter_img1, (filter_x1, filter_y1))
+        screen.blit(filter_img2, (filter_x2, filter_y2))
+
         for fish in fish_sprites:
             if fish.selected:
                 pg.draw.circle(
@@ -550,24 +559,6 @@ def main():
                 # screen.blit(outline_image, outline_rect)
             if show_hitboxes:
                 pg.draw.circle(screen, "white", fish.rect.center, fish.radius, 1)
-            if show_mouths:
-                pg.draw.circle(screen, "white", fish.rect.midright, 2)
-                pg.draw.circle(screen, "white", fish.rect.midleft, 2)
-        # Scrolling background
-        bgnd_x1 += int(bgnd_vel * dt)
-        bgnd_x2 += int(bgnd_vel * dt)
-        dx1 = bgnd_x1 - SCREEN_WIDTH
-        dx2 = bgnd_x2 - SCREEN_WIDTH
-        if dx1 >= 0:
-            bgnd_x1 = -SCREEN_WIDTH + dx1
-        if dx2 >= 0:
-            bgnd_x2 = -SCREEN_WIDTH + dx2
-        screen.blit(bgnd_img1, (bgnd_x1, bgnd_y1))
-        screen.blit(bgnd_img2, (bgnd_x2, bgnd_y2))
-
-        # Non scrolling background
-        # screen.blit(screen_filter, (0, 0))
-
         screen.blit(cursor.image, cursor.rect)
         pg.display.flip()
     pg.quit()
