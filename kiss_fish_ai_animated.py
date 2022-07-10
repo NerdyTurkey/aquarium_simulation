@@ -5,6 +5,8 @@ from random import random, randint, uniform, choice, choices
 from spritesheet_reader import get_frames
 from fish_properties import fish_properties
 import uuid
+from itertools import cycle
+from rotate_about_arb_origin import blit_rotate
 from pprint import pprint
 
 vec = pg.math.Vector2
@@ -372,6 +374,24 @@ def main():
     bubble_sprites = pg.sprite.Group()
     all_sprites = pg.sprite.Group()
 
+    # sea-grass
+    seagrass_scalefactor = 0.3
+    seagrass = pg.image.load("seagrass.png").convert_alpha()
+    seagrass = pg.transform.rotozoom(seagrass, 0, seagrass_scalefactor)
+    seagrass_w, seagrass_h = seagrass.get_size()
+
+    # coral
+    coral0 = pg.image.load("coral.png").convert_alpha()
+
+    coral1 = pg.transform.rotozoom(coral0, 0, 0.3)
+    coral1_w, coral1_h = coral1.get_size()
+    coral1_blit_pos = 20, SCREEN_HEIGHT - coral1_h + 20
+
+    coral2 = pg.transform.flip(coral1, True, False)
+    coral2 = pg.transform.rotozoom(coral0, 0, 0.2)
+    coral2_w, coral2_h = coral2.get_size()
+    coral2_blit_pos = SCREEN_WIDTH - coral2_w, SCREEN_HEIGHT - coral2_h + 20
+
     # For scrolling foreground "undersea" filter
     filter_x1, filter_y1 = 0, 0
     filter_x2, filter_y2 = -SCREEN_WIDTH, 0
@@ -458,6 +478,10 @@ def main():
     running = True
     num_fish_selected = 0
     selected_fishes = {}
+    counter = 0
+    seagrass_sway_amplitude = 0.5
+    seagrass_sway_freq = 0.05
+    seagrass_base_pos = SCREEN_WIDTH//2-50, SCREEN_HEIGHT
     while running:
         cursor.rect.center = pg.mouse.get_pos()
         dt = 0.001 * clock.tick(FPS)  # sec
@@ -489,7 +513,6 @@ def main():
                     paused = not paused
                 elif event.key == pg.K_h:
                     show_hitboxes = not show_hitboxes
-
 
         # remove matched fish
         selected_fishes_copy = selected_fishes.copy()
@@ -533,6 +556,15 @@ def main():
             running = False
         # draw
         all_sprites.draw(screen)
+
+        # coral
+        screen.blit(coral1, coral1_blit_pos)
+        screen.blit(coral2, coral2_blit_pos)
+
+        # sea-grass
+        counter += 1
+        seagrass_angle = seagrass_sway_amplitude * math.sin(seagrass_sway_freq * counter)
+        rect = blit_rotate(screen, seagrass, seagrass_base_pos, (seagrass_w//2, seagrass_h), seagrass_angle)
 
         # Scrolling foreground filter
         filter_x1 += int(filter_vel * dt)
